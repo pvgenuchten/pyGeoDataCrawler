@@ -1,6 +1,6 @@
 # pyGeoDataCrawler
 
-The tool is able to index datasets from a folder, from a database and from webservices. 
+The tool is able to index dataset properties from a folder-structure, from a database and from webservices. 
 Current backend is SQLite. The resulting indexed content can be used by [pygeoapi](http://pygeoapi.io) as a backend.
 But you can also use dashboard software to create visualisations on the indexed content.
 
