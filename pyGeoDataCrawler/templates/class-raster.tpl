@@ -1,0 +1,4 @@
+PROCESSING "NODATA=-32768"
+CLASS
+    NAME "style"
+END

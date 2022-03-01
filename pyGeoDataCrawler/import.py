@@ -9,6 +9,7 @@ from rasterio.crs import CRS
 from rasterio.warp import transform_bounds
 import sqlite3
 from sqlite3 import Error
+from utils import indexSpatialFile
 
 
 STORAGE = "SQLITE" #POSTGIS, ELASTIC, SQLITE
@@ -34,58 +35,7 @@ def indexFile(fname):
     #print ('-----------')
     print('Saving: ' +fname)
 
-def indexSpatialFile(fname, extension):
 
-# check if file is already in index
-    # check if file should be imported again (based on file hash?) 
-
-
-# if check if mcf exists
-    mcf = os.path.splitext(os.path.basename(fname))[0]+'.yml'
-    
-# elif check if a xml file 
-    xml = fname+'.xml'
-    # detect type of xml (esri-xml, qgis-xml, iso19139, DC, iso19115-3) 
-    # convert to mcf
-
-# else extract metadata from file (or update metadata from file content)
-
-    content = {
-                'identifier': os.path.splitext(os.path.basename(fname))[0],
-                'title': os.path.splitext(os.path.basename(fname))[0],
-                'url': fname,
-                'date': time.ctime(os.path.getmtime(fname))
-              }   
-    # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
-
-    # get spatial properties
-    if extension in GRID_FILE_TYPES:
-
-        d = rasterio.open(fname)
-        content['type'] = 'grid'
-        content['bounds'] = d.bounds
-        content['crs'] = d.crs
-        content['width'] = d.width
-        content['height'] = d.height
-        content['meta'] = d.meta
-       
-    elif extension in VECTOR_FILE_TYPES:
-
-        d = fiona.open(fname)
-        content['type'] = 'vector'
-        content['bounds'] = d.bounds
-        content['crs'] = d.crs
-
-        content['properties'] = {}
-        for k, v in d.schema['properties'].items():
-            content['properties'][k] = v
-
-
-        #check if local mcf exists
-        #else use mcf from a parent folder
-        #add new parameters to mcf
-
-    insert_or_update (content)
 
 def indexDir(dir):
 
@@ -102,7 +52,8 @@ def indexDir(dir):
             if ('.' in file):
                 base,extension = file.rsplit('.',1)
                 if extension.lower() in SPATIAL_FILE_TYPES:
-                    indexSpatialFile(fname, extension)
+                    cnt = indexSpatialFile(fname, extension)
+                    insert_or_update (cnt)
                 elif extension.lower() in INDEX_FILE_TYPES:
                     indexFile(fname)
                 else:
