@@ -1,0 +1,23 @@
+name: hellow world                   # service metadata
+abstract: some layers related to soilgrids
+contact: 
+    name: laura poggio
+    organisation: isric
+    email: soilgrids@isric.org
+keywords:
+    - soilgrids
+license: CC-BY
+mode: index
+crs: "epsg:111000"
+index: 
+    - path: ./bdod_0-5cm_mean_5000.tif
+      style: ./cfvo_0-5cm_mean_5000.style
+    - path: ./bdod_15-30cm_mean_5000.tif
+      style: ./cfvo_0-5cm_mean_5000.style 
+      crs: "epsg:111000"
+    - path: ./point.shp
+    - path: ./polygon.shp
+      crs: "epsg:4326"
+    - path: ./cities.vrt
+      title: Cities in Europe
+      crs: "epsg:4326"

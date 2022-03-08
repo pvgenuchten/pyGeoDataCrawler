@@ -71,59 +71,70 @@ def mapForDir(dir,dir_out):
             sf = os.path.join(dir,sf)
         cnt = indexSpatialFile (sf,ext)
 
-        cnt['name'] = cnt.get('name',ly.get('name', 'empty'))
-        cnt['title'] = cnt.get('title',ly.get('name', cnt['name']))
-        cnt['crs'] = cnt.get('crs','epsg:4326')
-        if (cnt['type'].lower() == "RASTER"):
-            cnt['type'] = 'raster'
-        elif (cnt['type'].lower() in ["linestring","line","multiline","polyline"]):
-            cnt['type'] = 'polygon'
-        elif (cnt['type'].lower() in ["point","multipoint"]):
-            cnt['type'] = 'point'
-        else:
-            cnt['type'] = 'polygon'
+        if cnt:
+            cnt['name'] = ly.get('name',cnt.get('name', 'unknown'))
+            print("Processing layer {0}".format(cnt['name']))
+            cnt['title'] = ly.get('title',cnt.get('title', cnt['name']))
+            cnt['crs'] = ly.get('crs', cnt.get('crs',''))
+            if (cnt['crs'] == ''):
+                cnt['crs'] = cnf.get("crs", 'epsg:4326')
 
-        try:
-            cnt['extent'] = "{0} {1} {2} {3}".format(cnt['bounds'][0],
-                                                     cnt['bounds'][1],
-                                                     cnt['bounds'][2],
-                                                     cnt['bounds'][3]) 
-        except:
-            cnt['extent'] = "-180 -90 180 90"
+            print("Original type is '{0}'".format(cnt['type']))
+            
+            if (cnt['type'].lower() == "raster"):
+                cnt['type'] = 'raster'
+            elif (cnt['type'].lower() in ["linestring","line","multiline","polyline","wkblinestring"]):
+                cnt['type'] = 'polygon'
+            elif (cnt['type'].lower() in ["point","multipoint","wkbpoint","table"]): # table is suggested for CSV, which is usually point (or none)
+                cnt['type'] = 'point'
+            else:
+                cnt['type'] = 'polygon'
 
-        cf = ly.get("style",'')
-        if not cf.startswith("/"):
-            cf = os.path.join(dir,sf)
-        try: 
-            with open(cf) as f:
-                new_class_string = f.read()
-                print ("Failed opening {0}, continue with '.'".format(ly.get("style",'')))
-        except: 
-            with open(os.path.join('templates','class-' + cnt['type'] + '.tpl')) as f:
-                new_class_string = f.read()
+            try:
+                cnt['extent'] = "{0} {1} {2} {3}".format(cnt['bounds'][0],
+                                                        cnt['bounds'][1],
+                                                        cnt['bounds'][2],
+                                                        cnt['bounds'][3]) 
+            except:
+                cnt['extent'] = "-180 -90 180 90"
 
-        # prepare layer
-        with open(os.path.join('templates','layer.tpl')) as f:
-            new_layer_string = f.read()
+            cf = ly.get("style",'')
+            if not cf.startswith("/"):
+                cf = os.path.join(dir,sf)
+            try: 
+                with open(cf) as f1:
+                    new_class_string = f1.read()
+                    print ("Failed opening '{0}', use default style for '{1}'".format(ly.get("style",''),cnt['type']))
+            except: 
+                with open(os.path.join('templates','class-' + cnt['type'] + '.tpl')) as f2:
+                    new_class_string2 = f2.read()
 
-        strLr = new_layer_string.format(name=cnt['name'], 
-                                        title=cnt['name'],
-                                        abstract=ly.get('abstract',''), 
-                                        type=cnt['type'], 
-                                        path=ly["path"],
-                                        template=ly.get('template','info.html'), 
-                                        projection=cnt['crs'], 
-                                        projections=ly.get('projections','epsg:4326 epsg:3857'), 
-                                        extent=cnt['extent'], 
-                                        mdurl=cnf.get('mdUrlPattern','').format(ly.get('uuid','')),  
-                                        classes=new_class_string)
+            if (cnt['type']=='raster'): #fetch nodata from meta in file properties
+                new_class_string2 = 'PROCESSING "NODATA='+ str(cnt.get('meta',{}).get('nodata',-32768)) + '"\n' + new_class_string2
 
-        print(strLr) 
-    
-        mslr = mappyfile.loads(strLr)
-        
-        lyrs.insert(len(lyrs)+1, mslr) 
-    
+            # prepare layer
+            with open(os.path.join('templates','layer.tpl')) as f3:
+                new_layer_string = f3.read()
+
+            strLr = new_layer_string.format(name=cnt['name'], 
+                                            title=cnt['name'],
+                                            abstract=ly.get('abstract',''), 
+                                            type=cnt['type'], 
+                                            path=ly["path"],
+                                            template=ly.get('template','info.html'), 
+                                            projection=cnt['crs'], 
+                                            projections=ly.get('projections','epsg:4326 epsg:3857'), 
+                                            extent=cnt['extent'], 
+                                            mdurl=cnf.get('mdUrlPattern','').format(ly.get('uuid','')),  
+                                            classes=new_class_string2)
+
+            try:        
+                mslr = mappyfile.loads(strLr)
+            
+                lyrs.insert(len(lyrs)+1, mslr) 
+            except Exception as e:
+                print("Failed creation of layer {0}; {1}".format(cnt['name'],e))
+
     # map should have initial layer, remove it
     lyrs.pop(0)
 

@@ -1,0 +1,8 @@
+<OGRVRTDataSource>
+    <OGRVRTLayer name="cities">
+        <SrcDataSource relativeToVRT="1">./cities.csv</SrcDataSource>
+        <GeometryType>wkbPoint</GeometryType>
+        <LayerSRS>WGS84</LayerSRS>
+        <GeometryField encoding="PointFromColumns" x="lng" y="lat"/>
+    </OGRVRTLayer>
+</OGRVRTDataSource>
