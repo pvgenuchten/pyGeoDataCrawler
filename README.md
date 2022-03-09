@@ -13,7 +13,7 @@ Several options exist for using the results of the index:
 The tool looks for existing metadata using common conventions, else it will try to generate the metadata 
 using GDAL/OGR to retrieve details about files. Current backend is SQLite.
 
-For metadata imports the tool wil use [bridge-metadata](https://github.com/pvgenuchten/bridge-metadata), which supports a wide range of metadata formats. 
+For metadata imports the tool wil use [owslib](https://github.com/geopython/owslib) or [pygeometa](https://github.com/geopython/pygeometa), which supports a some metadata formats. 
 
 Usage (index files recursively from a file folder)
 
@@ -23,7 +23,7 @@ pygdac index c:\foo
 
 ## Create OGC services
 
-The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder.
+The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A configuraton file is expected at the root of the folder to be indexed, if not, it will be created.
 
 ```
 python mapfile.py -dir=/mnt/data -out-dir=/mnt/mapserver/mapfiles
