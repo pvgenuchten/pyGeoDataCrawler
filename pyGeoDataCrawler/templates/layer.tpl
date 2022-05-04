@@ -8,7 +8,12 @@ LAYER
     EXTENT {extent}
     STATUS on
     Template '{template}'
+
+    VALIDATION
+      "ows_url" "(\b(https?|ftp|file)://)?[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]"
+    END
     METADATA
+        'ows_onlineresource'         "%ows_url%"
         'ows_title'                 '{title}'
         'ows_abstract'                 '{abstract}'
         'ows_extent'                '{extent}'

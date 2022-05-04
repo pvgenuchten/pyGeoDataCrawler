@@ -26,7 +26,7 @@ pygdac index c:\foo
 The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A configuraton file is expected at the root of the folder to be indexed, if not, it will be created.
 
 ```
-python mapfile.py -dir=/mnt/data -out-dir=/mnt/mapserver/mapfiles
+python mapfile.py -dir=/mnt/data -dir-out=/mnt/mapserver/mapfiles
 ```
 
 A mapserver docker image is available which is able to expose a folder of mapfiles as mapservices, eg http://example.com/{mapfile}?request=getcapabilities&service=wms
