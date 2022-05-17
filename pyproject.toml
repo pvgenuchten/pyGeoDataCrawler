@@ -4,8 +4,8 @@ version = "0.1.0"
 description = ""
 authors = ["Paul van Genuchten <paul.vangenuchten@wur.nl>"]
 packages = [
-    { include = "src/geodatacrawler" },
-    { include = "src/geodatacrawler/templates/*" },
+    { include = "geodatacrawler", from = "src" },
+    { include = "geodatacrawler/templates/*", from = "src" },
 ]
 
 [tool.poetry.dependencies]
