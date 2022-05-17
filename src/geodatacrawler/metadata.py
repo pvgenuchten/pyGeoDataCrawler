@@ -212,6 +212,7 @@ def insert_or_update(content, db, dbtype):
     finally:
         if conn:
             conn.close()
+
     return True
     # elif index = postgis
 

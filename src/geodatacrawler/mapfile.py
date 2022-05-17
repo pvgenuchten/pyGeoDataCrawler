@@ -157,7 +157,7 @@ def mapForDir(dir, dir_out):
 
         mappyfile.save(mf, os.path.join(dir_out, cnf['name'] + ".map"), indent=4, spacer=' ', quote='"', newlinechar='\n',
                        end_comment=False, align_values=False)
-    
+ 
 def colorCoding(min,max):
     rng = max - min
     if rng > 0:
