@@ -111,8 +111,6 @@ def indexSpatialFile(fname, extension):
         # else
         # create iso
 
-
-
     return (content)
 
 # from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
