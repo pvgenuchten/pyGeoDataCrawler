@@ -21,6 +21,7 @@ LAYER
         'ows_metadataurl_type'      'TC211'
         'ows_metadataurl_format'    'application/xml'
         'ows_metadataurl_href'      '{mdurl}'
+        'ows_service_onlineresource' 'https://dev-maps-worldsoils.isric.org/{title}'
     END
     {classes}
 END
