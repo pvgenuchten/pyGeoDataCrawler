@@ -31,7 +31,7 @@ def mapForDir(dir, dir_out):
     # read (or create) root metadata file, todo: delegate to utils
     try:
         # Open the file and load the file
-        with open(os.path.join(dir, 'index.yml')) as f:
+        with open(os.path.join(dir, 'index.yml'), mode="r", encoding="utf-8") as f:
             cnf = yaml.load(f, Loader=SafeLoader)
             print(cnf)
     except FileNotFoundError:
@@ -112,18 +112,29 @@ def mapForDir(dir, dir_out):
                     cnt['extent'] = "-180 -90 180 90"
 
                 cf = ly.get("style", '')
-                if not cf.startswith("/"):
-                    cf = os.path.join(dir, sf)
-                try:
-                    with open(cf) as f1:
-                        new_class_string = f1.read()
-                        print("Failed opening '{0}', use default style for '{1}'".format(ly.get("style", ""), cnt['type']))
-                except:
-                    new_class_string2 = pkg_resources.read_text(templates, 'class-' + cnt['type'] + '.tpl')
+                if (cf=='' and cnt['type']=='raster'): # set colors for range
+                    rng = cnt.get('max',0) - cnt.get('min',0)
+                    if rng > 0:
+                        sgmt = rng/8
+                        cur = cnt.get('min',0)
+                        new_class_string2 = ""
+                        for clr in ["'#fcfdbf'","'#fec085'","'#fa825f'","'#e14d67'","'#ae347c'","'#782282'","'#440f76'","'#150e37'"]:
+                            new_class_string2 += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR {2}\nEND\nEND\n\n".format(cur,cur+sgmt,clr)
+                            cur += sgmt
+                        print(new_class_string2)
+                else: 
+                    if not cf.startswith("/"):
+                        cf = os.path.join(dir, sf)
+                    try:
+                        with open(cf) as f1:
+                            new_class_string = f1.read()
+                            print("Failed opening '{0}', use default style for '{1}'".format(ly.get("style", ""), cnt['type']))
+                    except:
+                        new_class_string2 = pkg_resources.read_text(templates, 'class-' + cnt['type'] + '.tpl')
 
-                if (cnt['type'] == 'raster'):  # fetch nodata from meta in file properties
-                    new_class_string2 = 'PROCESSING "NODATA=' + str(
-                        cnt.get('meta', {}).get('nodata', -32768)) + '"\n' + new_class_string2
+                    if (cnt['type'] == 'raster'):  # fetch nodata from meta in file properties
+                        new_class_string2 = 'PROCESSING "NODATA=' + str(
+                            cnt.get('meta', {}).get('nodata', -32768)) + '"\n' + new_class_string2
 
                 # prepare layer
                 new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')

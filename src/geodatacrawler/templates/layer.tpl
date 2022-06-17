@@ -15,13 +15,14 @@ LAYER
     METADATA
         'ows_onlineresource'         "%ows_url%"
         'ows_title'                 '{title}'
-        'ows_abstract'                 '{abstract}'
+        'ows_abstract'              '{abstract}'
         'ows_extent'                '{extent}'
         'ows_srs'                   '{projection} {projections}'
         'ows_metadataurl_type'      'TC211'
         'ows_metadataurl_format'    'application/xml'
         'ows_metadataurl_href'      '{mdurl}'
-        'ows_service_onlineresource' 'https://dev-maps-worldsoils.isric.org/{title}'
+        'wms_include_items'         'all'
+        'gml_include_items'         'all'
     END
     {classes}
 END

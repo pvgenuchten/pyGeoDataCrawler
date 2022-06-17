@@ -54,6 +54,10 @@ def indexSpatialFile(fname, extension):
         content['width'] = d.width
         content['height'] = d.height
         content['meta'] = d.meta
+        ds = d.read(masked=True)
+        content['max'] = ds.max()
+        content['min'] = ds.min()
+        #content['mean'] = ds.mean()
 
     elif extension in VECTOR_FILE_TYPES:
         with fiona.open(fname, "r") as source:
