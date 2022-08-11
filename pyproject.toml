@@ -1,4 +1,4 @@
-[tool.poetry]
+ [tool.poetry]
 name = "geodatacrawler"
 version = "0.1.0"
 description = ""
@@ -9,13 +9,16 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 PyYAML = "^6.0"
 Fiona = "^1.8.21"
 rasterio = "^1.2.10"
 pysqlite3 = "^0.4.7"
 mappyfile = "^0.9.7"
 GDAL = "3.3.2"
+pygeometa = "^0.11.1"
+OWSLib = "^0.26.0"
+pyproj = "3.2.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

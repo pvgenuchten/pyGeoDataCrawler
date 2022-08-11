@@ -1,0 +1,48 @@
+mcf:
+  version: 1.0
+metadata:
+  language: en
+  identifier: demo-nested-raster2
+  hierarchylevel: dataset
+  datestamp: 2022-08-11 15:36:28.311042
+spatial:
+  datatype: RASTER
+  geomtype: RASTER
+identification:
+  language: eng
+  title:
+    en: raster2
+  abstract:
+    en: ''
+  dates:
+    creation: Wed Feb  9 14:54:24 2022
+  extents:
+    spatial:
+    - bbox:
+      - 0.0
+      - 159.0
+      - 163.0
+      - 0.0
+      crs: null
+content_info:
+  type: image
+  tags:
+    TIFFTAG_DOCUMENTNAME: /home/sean/projects/ms_43/mapserver/tests/raster.tif
+    TIFFTAG_RESOLUTIONUNIT: 2 (pixels/inch)
+    TIFFTAG_XRESOLUTION: '72'
+    TIFFTAG_YRESOLUTION: '72'
+  dimensions:
+  - units:
+    - null
+    min: 2.0
+    max: 120.0
+    width: 163
+    height: 159
+distribution:
+  www:
+    url: http://example.com/demo/nested/raster2.tif
+    type: WWW:LINK
+    rel: canonical
+    name:
+      en: raster2
+    function: download
