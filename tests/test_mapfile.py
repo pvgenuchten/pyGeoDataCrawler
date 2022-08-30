@@ -1,4 +1,7 @@
-from geodatacrawler import __version__
+from geodatacrawler.mapfile import colorCoding
 
-def test_version():
-    assert __version__ == '0.1.0'
+def test_colorCoding():
+    clsstr = colorCoding(2,10)
+    assert clsstr.find('2 - 3') > -1
+    clsstr = colorCoding(10,2)
+    assert clsstr == ""

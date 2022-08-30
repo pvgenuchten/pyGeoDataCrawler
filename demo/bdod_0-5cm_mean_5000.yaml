@@ -3,19 +3,26 @@ mcf:
 metadata:
   language: en
   identifier: demo-bdod_0-5cm_mean_5000
-  hierarchylevel: dataset
-  datestamp: 2022-08-11 15:36:25.392056
-spatial:
-  datatype: RASTER
-  geomtype: RASTER
+  datestamp: 2022-08-29 22:15:20.251753
 identification:
   language: eng
   title:
     en: bdod_0-5cm_mean_5000
   abstract:
-    en: ''
+    en: Empty abstract
+  keywords:
+    default:
+      keywords:
+        en:
+        - Empty keyword
+  fees: None
+  accessconstraints: otherRestrictions
+  rights:
+    en: https://creativecommons.org/licenses/by/4.0/
+  topiccategory:
+  - geoscientificInformation
   dates:
-    creation: Fri Jun 17 08:40:07 2022
+    creation: Sun Jun 12 21:21:54 2022
   extents:
     spatial:
     - bbox:
@@ -24,6 +31,14 @@ identification:
       - 19860250.0
       - 8361000.0
       crs: null
+contact:
+  pointOfContact:
+    organization: Empty
+    email: Empty
+spatial:
+  datatype: RASTER
+  geomtype: RASTER
+distribution: {}
 content_info:
   type: image
   cloud_cover: 72
@@ -50,11 +65,3 @@ content_info:
     Outputs_abstract: no WISE, March 2020 snapshot, NZ and Siberia gaps
     Outputs_version: RUN03
     WoSIS_version: Data stream 7
-distribution:
-  www:
-    url: http://example.com/demo/bdod_0-5cm_mean_5000.tif
-    type: WWW:LINK
-    rel: canonical
-    name:
-      en: bdod_0-5cm_mean_5000
-    function: download

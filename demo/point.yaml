@@ -2,12 +2,12 @@ mcf:
   version: 1.0
 metadata:
   language: en
-  identifier: demo-nested-raster2
-  datestamp: 2022-08-29 22:15:20.317283
+  identifier: demo-point
+  datestamp: 2022-08-29 22:15:13.587901
 identification:
   language: eng
   title:
-    en: raster2
+    en: point
   abstract:
     en: Empty abstract
   keywords:
@@ -22,34 +22,25 @@ identification:
   topiccategory:
   - geoscientificInformation
   dates:
-    creation: Fri Aug 12 12:42:38 2022
+    creation: Sun Jun 12 21:20:44 2022
   extents:
     spatial:
     - bbox:
       - 0.0
-      - 159.0
-      - 163.0
+      - 51.477222
       - 0.0
-      crs: null
+      - 51.477222
+      crs:
+        init: epsg:4326
 contact:
   pointOfContact:
     organization: Empty
     email: Empty
 spatial:
-  datatype: RASTER
-  geomtype: RASTER
+  datatype: vector
+  geomtype: Point
 distribution: {}
 content_info:
-  type: image
-  tags:
-    TIFFTAG_DOCUMENTNAME: /home/sean/projects/ms_43/mapserver/tests/raster.tif
-    TIFFTAG_RESOLUTIONUNIT: 2 (pixels/inch)
-    TIFFTAG_XRESOLUTION: '72'
-    TIFFTAG_YRESOLUTION: '72'
-  dimensions:
-  - units:
-    - null
-    min: 2.0
-    max: 120.0
-    width: 163
-    height: 159
+  attributes:
+    FID: int:10
+    FNAME: str:10
