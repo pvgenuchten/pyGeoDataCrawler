@@ -25,6 +25,7 @@ GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
 VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'xls']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 
+baseurl = "https://dev-s4a-webdav.containers.wurnet.nl/"
 
 def indexFile(fname):
     # createEncodedTempFile(fname)
@@ -85,8 +86,10 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
                     prvPath = path
                     with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
                         pathMetadata = yaml.load(yf, Loader=SafeLoader)
-                        pathMetadata.pop('index')
-                        pathMetadata.pop('mode')
+                        if 'index' in pathMetadata.keys():
+                            pathMetadata.pop('index')
+                        if 'mode' in pathMetadata.keys():     
+                            pathMetadata.pop('mode')
                         dict_merge(pathMetadata,coreMetadata)
                         coreMetadata = pathMetadata
             else:
@@ -117,7 +120,8 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
                         except Exception as e:
                             print('Failed to dump yaml:',e)
                     elif mode=='export':
-                        try:
+                        #try:
+                            
                             with open(os.path.join(yf), mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 dict_merge(cnf,coreMetadata)
@@ -126,6 +130,20 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
                                 elif dbtype == "path":
                                     #load yml as mcf
                                     md = read_mcf(cnf)
+                                    if not 'metadata' in md.keys():
+                                        md['metadata'] = {}
+                                    if not 'identifier' in md['metadata'].keys() or not md['metadata']['identifier']:
+                                        md['metadata']['identifier'] = base
+                                    if not 'distribution' in md.keys():
+                                        md['distribution'] = {}
+                                    md['distribution'][base] = {
+                                        "url": baseurl + str(file),
+                                        "type": "WWW:LINK",
+                                        "rel": "canonical",
+                                        "name": base,
+                                        "description":"",
+                                        "function": "download"
+                                    }
                                     #yaml to iso/dcat
                                     if schemaPath and os.path.exists(schemaPath):
                                         print('Using schema',schemaPath)
@@ -142,8 +160,8 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
                                         print('iso19139 xml generated at '+pth)
-                        except Exception as e:
-                            print('Failed to create xml:',e)
+                        #except Exception as e:
+                        #    print('Failed to create xml:',e)
                 else:
                     None
                     # print('Skipping {}, not approved file type: {}'.format(fname, extension))

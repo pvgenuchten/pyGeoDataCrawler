@@ -31,7 +31,7 @@ def mapForDir(dir, dir_out):
     # read (or create) root metadata file, todo: delegate to utils
     try:
         # Open the file and load the file
-        with open(os.path.join(dir, 'index.yml'), mode="r", encoding="utf-8") as f:
+        with open(os.path.join(dir, 'index.yaml'), mode="r", encoding="utf-8") as f:
             cnf = yaml.load(f, Loader=SafeLoader)
             print(cnf)
     except FileNotFoundError:
@@ -48,7 +48,7 @@ def mapForDir(dir, dir_out):
             "mode": "index"
         }
         try:
-            with open(os.path.join(dir, 'index.yml'), 'w') as f:
+            with open(os.path.join(dir, 'index.yaml'), 'w') as f:
                 yaml.dump(cnf, f)
         except Exception as e:
             print(e)
