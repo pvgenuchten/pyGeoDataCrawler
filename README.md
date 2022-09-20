@@ -9,6 +9,7 @@ Several options exist for using the results of the index:
 - Automated creation of a mapserver mapfile to provide OGC services on top of the spatial files identified
 - Set up an ETL process which triggers conversion of the dataset to an alternative datamodel (todo)
 
+
 ## Index metadata
 
 The tool will try to generate metadata 
@@ -42,6 +43,7 @@ Most parameters are configured from the commandline, check --help to get explana
 - pgdc_schema_path is a physical path to an override of the default iso19139 schema of pygeometa, containing jinja templates to format the exported xml
 
 ## Create mapfile
+=======
 
 The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A configuraton file is expected at the root of the folder to be indexed, if not, it will be created.
 
@@ -103,5 +105,3 @@ Mount the volume on wsl
 sudo mkdir /mnt/z
 sudo mount -t drvfs Z: /mnt/z
 ```
-
-

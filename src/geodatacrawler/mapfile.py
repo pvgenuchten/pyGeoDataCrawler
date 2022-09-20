@@ -113,15 +113,7 @@ def mapForDir(dir, dir_out):
 
                 cf = ly.get("style", '')
                 if (cf=='' and cnt['type']=='raster'): # set colors for range
-                    rng = cnt.get('max',0) - cnt.get('min',0)
-                    if rng > 0:
-                        sgmt = rng/8
-                        cur = cnt.get('min',0)
-                        new_class_string2 = ""
-                        for clr in ["'#fcfdbf'","'#fec085'","'#fa825f'","'#e14d67'","'#ae347c'","'#782282'","'#440f76'","'#150e37'"]:
-                            new_class_string2 += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR {2}\nEND\nEND\n\n".format(cur,cur+sgmt,clr)
-                            cur += sgmt
-                        print(new_class_string2)
+                    new_class_string2 = colorCoding(cnt.get('min',0), cnt.get('max',0))
                 else: 
                     if not cf.startswith("/"):
                         cf = os.path.join(dir, sf)
@@ -165,3 +157,16 @@ def mapForDir(dir, dir_out):
 
         mappyfile.save(mf, os.path.join(dir_out, cnf['name'] + ".map"), indent=4, spacer=' ', quote='"', newlinechar='\n',
                        end_comment=False, align_values=False)
+    
+def colorCoding(min,max):
+    rng = max - min
+    if rng > 0:
+        sgmt = rng/8
+        cur = min
+        clsstr = ""
+        for clr in ["'#fcfdbf'","'#fec085'","'#fa825f'","'#e14d67'","'#ae347c'","'#782282'","'#440f76'","'#150e37'"]:
+            clsstr += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR {2}\nEND\nEND\n\n".format(cur,cur+sgmt,clr)
+            cur += sgmt
+        return clsstr
+    else:
+        return ""

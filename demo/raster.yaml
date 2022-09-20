@@ -2,12 +2,12 @@ mcf:
   version: 1.0
 metadata:
   language: en
-  identifier: demo-nested-raster2
-  datestamp: 2022-08-29 22:15:20.317283
+  identifier: demo-raster
+  datestamp: 2022-08-29 22:15:13.408914
 identification:
   language: eng
   title:
-    en: raster2
+    en: raster
   abstract:
     en: Empty abstract
   keywords:
@@ -22,14 +22,14 @@ identification:
   topiccategory:
   - geoscientificInformation
   dates:
-    creation: Fri Aug 12 12:42:38 2022
+    creation: Sun Jun 12 21:20:44 2022
   extents:
     spatial:
     - bbox:
-      - 0.0
-      - 159.0
-      - 163.0
-      - 0.0
+      - -8.0333333
+      - 49.233343899999994
+      - 2.8333224999999995
+      - 59.8333333
       crs: null
 contact:
   pointOfContact:

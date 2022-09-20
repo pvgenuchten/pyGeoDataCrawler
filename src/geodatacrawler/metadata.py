@@ -9,6 +9,7 @@ import datetime
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from pygeometa.core import read_mcf, render_j2_template
 from geodatacrawler.utils import indexSpatialFile, dict_merge
+from pathlib import Path
 
 from . import templates
 
@@ -17,7 +18,7 @@ if not rootUrl:
     rootUrl = 'http://example.com/'
 schemaPath = os.getenv('pgdc_schema_path')
 if not schemaPath:
-    schemaPath = "/mnt/c/Users/genuc003/Projects/geopython/pyGeoDataCrawler/src/geodatacrawler/schemas"
+    schemaPath = "/pyGeoDataCrawler/src/geodatacrawler/schemas"
 
 # for supported formats, see apache tika - http://tika.apache.org/1.4/formats.html
 INDEX_FILE_TYPES = ['html', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xml', 'json']
@@ -48,6 +49,8 @@ def indexFile(fname):
 def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
     if not dir:
         dir = "."
+    if not dir_out:
+        dir_out = dir
     if not dir_out_mode or dir_out_mode not in ["flat","nested"]:
         dir_out_mode = "flat"
     if not mode or mode not in ["init","update","export"]:
@@ -73,34 +76,44 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
 
     # core metadata gets populated by merging the index.yaml content from parent folders
     coreMetadata = {}
-    # identify if there is a path change
-    prvPath="dummy"
 
-    for path, dirs, files in os.walk(dir):
-        if mode == 'export':
-            # if dir has index.yaml merge it to parent
-            f = os.path.join(path,'index.yaml')
-            if os.path.exists(f):   
-                if prvPath != path:
-                    print ('Indexing path ' + path)
-                    prvPath = path
-                    with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
-                        pathMetadata = yaml.load(yf, Loader=SafeLoader)
-                        if 'index' in pathMetadata.keys():
-                            pathMetadata.pop('index')
-                        if 'mode' in pathMetadata.keys():     
-                            pathMetadata.pop('mode')
-                        dict_merge(pathMetadata,coreMetadata)
-                        coreMetadata = pathMetadata
-            else:
-                print(f+' does not exist') # create it?
-        for file in files:
-            fname = os.path.join(path, file)
-            if '.' in file:
-                base, extension = file.rsplit('.', 1)
+    processPath(dir, coreMetadata, mode, dbtype, dir_out, dir_out_mode)
+
+def merge_folder_metadata(coreMetadata, path):    
+
+    # if dir has index.yaml merge it to parent
+    print('merging',path,'index.yaml')
+    f = os.path.join(path,'index.yaml')
+    if os.path.exists(f):   
+        print ('Indexing path ' + path)
+        prvPath = path
+        with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
+            pathMetadata = yaml.load(yf, Loader=SafeLoader)
+            pathMetadata.pop('index')
+            pathMetadata.pop('mode')
+            dict_merge(pathMetadata, coreMetadata)
+            return pathMetadata
+    else:
+        print('Index '+f+' does not exist') # create it?
+        return coreMetadata
+
+def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode):
+    if mode == 'export':
+        coreMetadata = merge_folder_metadata(parentMetadata, target_path, mode)
+    else:
+        coreMetadata = parentMetadata
+    for file in Path(target_path).iterdir():
+        if file.is_dir():
+            # go one level deeper
+            processPath(str(file), coreMetadata, mode, dbtype, dir_out, dir_out_mode)
+        else:
+            # process the file
+            fname = str(file)
+            if '.' in str(file):
+                base, extension = str(file).rsplit('.', 1)
                 if extension.lower() in SPATIAL_FILE_TYPES:
                     print ('Indexing file ' + fname)
-                    yf = os.path.join(path,base+'.yaml')
+                    yf = os.path.join(base+'.yaml')
                     if (mode=='update' or (not os.path.exists(yf) and mode=='init')):
                         # mode init for spatial files without metadata or update
                         cnt = indexSpatialFile(fname, extension) 
@@ -121,14 +134,17 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
                             print('Failed to dump yaml:',e)
                     elif mode=='export':
                         #try:
-                            
+
                             with open(os.path.join(yf), mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
-                                dict_merge(cnf,coreMetadata)
+                                print('cnf:',cnf)
+                                print('core:',coreMetadata)
+                                dict_merge(coreMetadata,cnf)
                                 if dbtype == 'sqlite' or dbtype=='postgres':
-                                    insert_or_update(cnt, dir_out)
+                                    insert_or_update(cnf, dir_out)
                                 elif dbtype == "path":
                                     #load yml as mcf
+                                    print(cnf)
                                     md = read_mcf(cnf)
                                     if not 'metadata' in md.keys():
                                         md['metadata'] = {}
@@ -170,7 +186,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
                 # print('Skipping {}, no extension'.format(fname))
 
 
-def insert_or_update(content, db):
+def insert_or_update(content, db, dbtype):
     """ run a query """
     try:
         if dbtype == 'sqlite':
@@ -203,17 +219,24 @@ def insert_or_update(content, db):
 def asPGM(dct):
     tpl = pkg_resources.open_text(templates, 'PGM.tpl')
     exp = yaml.safe_load(tpl)
+    for k in ['metadata','spatial','identification','distribution']:
+        if not k in exp.keys():
+            exp[k] = {}
+
     exp['metadata']['identifier'] = dct.get('identifier',dct['name'])
     exp['metadata']['datestamp'] = datetime.datetime.now()
     exp['spatial']['datatype'] = dct.get('datatype','')
     exp['spatial']['geomtype'] = dct.get('geomtype','')
-    exp['identification']['title']['en'] = dct['name'] 
-    exp['identification']['dates']['creation'] = dct.get('date',datetime.datetime.now()) 
-    exp['identification']['extents']['spatial'][0]['bbox'] =  dct.get('bounds',[])
-    exp['identification']['extents']['spatial'][0]['crs'] = dct.get('crs','4326')
+    exp['identification']['title'] = { 'en': dct['name'] } 
+    exp['identification']['dates'] = { 'creation': dct.get('date',datetime.datetime.now()) }
+    if 'extents' not in exp['identification'].keys():
+        exp['identification']['extents'] = {}
+    exp['identification']['extents']['spatial'] = [
+        {'bbox': dct.get('bounds',[]), 
+         'crs' : dct.get('crs','4326')}]
     exp['content_info'] = dct.get('content_info',{}) 
-    exp['distribution']['www']['url'] = rootUrl+dct['url'] 
-    exp['distribution']['www']['name']['en'] = dct['name'] 
+    #exp['distribution']['www']['url'] = rootUrl+dct['url'] 
+    #exp['distribution']['www']['name']['en'] = dct['name'] 
     return exp
 
 def createIndexIfDoesntExist(db):

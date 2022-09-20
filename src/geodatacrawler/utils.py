@@ -42,8 +42,8 @@ def indexSpatialFile(fname, extension):
     if extension in GRID_FILE_TYPES:
 
         d = rasterio.open(fname)
-        content['datatype'] = 'RASTER'
-        content['geomtype'] = 'RASTER'
+        content['datatype'] = 'raster'
+        content['geomtype'] = 'raster'
         content['bounds'] = [d.bounds.left,d.bounds.bottom,d.bounds.right,d.bounds.top]
         ds = d.read(masked=True)
         # what about crs
@@ -77,8 +77,6 @@ def indexSpatialFile(fname, extension):
 
     elif extension in VECTOR_FILE_TYPES:
         with fiona.open(fname, "r") as source:
-            print(source)
-            print(content)
             content['datatype'] = "vector"
             try:
                 content['geomtype'] = source[0]['geometry']['type']
@@ -111,8 +109,6 @@ def indexSpatialFile(fname, extension):
         # else
         # create iso
 
-
-
     return (content)
 
 # from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
@@ -132,7 +128,7 @@ def dict_merge(dct, merge_dct):
                 if (k in dct and isinstance(dct[k], dict)):
                     dict_merge(dct[k], merge_dct[k])
                 else:
-                    if k in dct and k in merge_dct:
+                    if k in dct and dct[k] and k in merge_dct:
                         pass
                     else:
                         dct[k] = merge_dct[k]
