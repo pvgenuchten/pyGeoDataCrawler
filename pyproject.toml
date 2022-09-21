@@ -16,6 +16,7 @@ rasterio = "^1.2.10"
 pysqlite3 = "^0.4.7"
 mappyfile = "^0.9.7"
 GDAL = "3.3.2"
+pyproj = "^3.4.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
