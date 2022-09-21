@@ -5,10 +5,8 @@ import sys
 import pprint
 import urllib.request
 import fiona
-import rasterio
+from pyproj import CRS
 from osgeo import gdal, osr
-from rasterio.crs import CRS
-from rasterio.warp import transform_bounds
 
 from pprint import pprint
 
@@ -41,39 +39,48 @@ def indexSpatialFile(fname, extension):
     # get spatial properties
     if extension in GRID_FILE_TYPES:
 
-        d = rasterio.open(fname)
+        d = gdal.Open( fname )
+ 
         content['datatype'] = 'raster'
         content['geomtype'] = 'raster'
-        content['bounds'] = [d.bounds.left,d.bounds.bottom,d.bounds.right,d.bounds.top]
-        ds = d.read(masked=True)
-        # what about crs
-        if d.crs:
-            epsg = d.crs.to_epsg()
-            if epsg:
-                crs = 'EPSG:{}'.format(epsg)
-            else:
-                proj = osr.SpatialReference(wkt=d.crs.to_wkt())
-                if proj.GetAuthorityCode(None):
-                    #as in https://gis.stackexchange.com/questions/20298/is-it-possible-to-get-the-epsg-value-from-an-osr-spatialreference-class-using-th
-                    crs = "{}:{}".format(proj.GetAuthorityName(None),proj.GetAuthorityCode(None))
-                else:
-                    crs = None # d.crs.to_string() this returns full crs def, which fails when embedding in xml
-        else:
-            crs = None
-        content['crs'] = crs
+
+        #print(gdal.Info(d))
+
+        #bounds info
+        ulx, xres, xskew, uly, yskew, yres  = d.GetGeoTransform()
+        lrx = ulx + (d.RasterXSize * xres)
+        lry = uly + (d.RasterYSize * yres)
+
+        #get min-max, assume this is a single band gtiff
+        srcband = d.GetRasterBand(1)
+        if not srcband.GetMinimum():
+            srcband.ComputeStatistics(0)
+        mn=srcband.GetMinimum()
+        mx=srcband.GetMaximum()
+        
+        print(mn,mx)
+        content['bounds'] = [ulx, lry, lrx, uly]
+        content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
+        
+        #which crs
+        epsg = wkt2epsg(d.GetProjection())
+        content['crs'] = epsg
 
         content['content_info'] = {
                 "type": "image",
-                "tags": d.tags(),
                 "dimensions": [{
-                    "units": [units or None for units in d.units],
-                    "min": float(ds.min()),
-                    "max": float(ds.max()),
-                    "width": int(d.width),
-                    "height": int(d.height)
+                    "resolution": xres,
+                    "min": mn,
+                    "max": mx,
+                    "width": int(d.RasterXSize),
+                    "height": int(d.RasterYSize)
                 }]
             }
-        content['meta'] = d.meta
+        content['meta'] = d.GetMetadata()
+
+        print(content)
+
+        d = None
 
     elif extension in VECTOR_FILE_TYPES:
         with fiona.open(fname, "r") as source:
@@ -86,10 +93,11 @@ def indexSpatialFile(fname, extension):
             try:  # this sometimes fails, for example on csv files
                 b = source.bounds
                 content['bounds'] = [b[0],b[1],b[2],b[3]]
+                content['bounds_wgs84'] = reprojectBounds([b[0],b[1],b[2],b[3]],source.crs,4326)
             except:
                 print('Failed reading bounds')
             try:
-                content['crs'] = source.crs
+                content['crs'] = wkt2epsg(source.crs)
             except:
                 print('Failed reading crs')
             content['content_info'] = {"attributes":{}}    
@@ -134,3 +142,25 @@ def dict_merge(dct, merge_dct):
                         dct[k] = merge_dct[k]
             except Exception as e:
                 print(e,"; k:",k,"; v:",v)
+
+def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
+
+    crs = CRS.from_wkt(wkt)
+    epsg = crs.to_epsg()
+    if not epsg:
+        if (wkt == 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'):
+            return "epsg:42106"
+        print('Unable to identify: ' + wkt)
+    else:
+        return "epsg:" + epsg 
+
+def reprojectBounds(bnds,src,trg):
+    # Setup the source projection - you can also import from epsg, proj4...
+    source = osr.SpatialReference()
+    source.ImportFromWkt(src)
+    target = osr.SpatialReference()
+    target.ImportFromEPSG(trg)
+    transform = osr.CoordinateTransformation(source, target)
+    lr = transform.TransformPoint(bnds[0],bnds[1])
+    ul = transform.TransformPoint(bnds[2],bnds[3])
+    return [lr[0],lr[1],ul[0],ul[1]]
