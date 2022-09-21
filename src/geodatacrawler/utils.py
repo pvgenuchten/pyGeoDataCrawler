@@ -144,9 +144,12 @@ def dict_merge(dct, merge_dct):
                 print(e,"; k:",k,"; v:",v)
 
 def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
-
-    crs = CRS.from_wkt(wkt)
-    epsg = crs.to_epsg()
+    try:
+        crs = CRS.from_wkt(wkt)
+        epsg = crs.to_epsg()
+    except Exception as e:
+        print('Invalid src (wkt) provided: ', e)
+        return None
     if not epsg:
         if (wkt == 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'):
             return "epsg:42106"
@@ -155,12 +158,26 @@ def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
         return "epsg:" + epsg 
 
 def reprojectBounds(bnds,src,trg):
-    # Setup the source projection - you can also import from epsg, proj4...
-    source = osr.SpatialReference()
-    source.ImportFromWkt(src)
-    target = osr.SpatialReference()
-    target.ImportFromEPSG(trg)
-    transform = osr.CoordinateTransformation(source, target)
-    lr = transform.TransformPoint(bnds[0],bnds[1])
-    ul = transform.TransformPoint(bnds[2],bnds[3])
-    return [lr[0],lr[1],ul[0],ul[1]]
+    if src and len(src) > 0:
+        # Setup the source projection - you can also import from epsg, proj4...
+        source = osr.SpatialReference()
+        try:
+            source.ImportFromWkt(src)
+        except Exception as e:
+            print('Invalid src (wkt) provided: ', e)
+            return None
+        if not source:
+            print('Error while importing wkt from source: ', src)
+            return None
+        target = osr.SpatialReference()
+        target.ImportFromEPSG(trg)
+        try:
+            transform = osr.CoordinateTransformation(source, target)
+            lr = transform.TransformPoint(bnds[0],bnds[1])
+            ul = transform.TransformPoint(bnds[2],bnds[3])
+            return [lr[0],lr[1],ul[0],ul[1]]
+        except:
+            return None
+    else:
+        print('No projection info provided', src)
+        return None

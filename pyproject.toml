@@ -17,6 +17,7 @@ pysqlite3 = "^0.4.7"
 mappyfile = "^0.9.7"
 GDAL = "3.3.2"
 pyproj = "^3.4.0"
+OWSLib = "^0.27.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
