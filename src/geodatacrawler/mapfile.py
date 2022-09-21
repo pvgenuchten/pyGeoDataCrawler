@@ -31,7 +31,7 @@ def mapForDir(dir, dir_out):
     # read (or create) root metadata file, todo: delegate to utils
     try:
         # Open the file and load the file
-        with open(os.path.join(dir, 'index.yml'), mode="r", encoding="utf-8") as f:
+        with open(os.path.join(dir, 'index.yaml'), mode="r", encoding="utf-8") as f:
             cnf = yaml.load(f, Loader=SafeLoader)
             print(cnf)
     except FileNotFoundError:
@@ -48,7 +48,7 @@ def mapForDir(dir, dir_out):
             "mode": "index"
         }
         try:
-            with open(os.path.join(dir, 'index.yml'), 'w') as f:
+            with open(os.path.join(dir, 'index.yaml'), 'w') as f:
                 yaml.dump(cnf, f)
         except Exception as e:
             print(e)
@@ -91,13 +91,14 @@ def mapForDir(dir, dir_out):
                 if (cnt['crs'] == ''):
                     cnt['crs'] = cnf.get("crs", 'epsg:4326')
 
-                print("Original type is '{0}'".format(cnt['type']))
+                print("Original type is '{0}'".format(cnt.get('datatype','unknown')))
 
-                if (cnt['type'].lower() == "raster"):
+
+                if (cnt['datatype'].lower() == "raster"):
                     cnt['type'] = 'raster'
-                elif (cnt['type'].lower() in ["linestring", "line", "multiline", "polyline", "wkblinestring"]):
+                elif (cnt['geomtype'].lower() in ["linestring", "line", "multiline", "polyline", "wkblinestring"]):
                     cnt['type'] = 'polygon'
-                elif (cnt['type'].lower() in ["point", "multipoint", "wkbpoint",
+                elif (cnt['geomtype'].lower() in ["point", "multipoint", "wkbpoint",
                                               "table"]):  # table is suggested for CSV, which is usually point (or none)
                     cnt['type'] = 'point'
                 else:
@@ -111,9 +112,11 @@ def mapForDir(dir, dir_out):
                 except:
                     cnt['extent'] = "-180 -90 180 90"
 
+                band1 = cnt.get('content_info',{}).get('dimensions',[{}])[0];
+            
                 cf = ly.get("style", '')
                 if (cf=='' and cnt['type']=='raster'): # set colors for range
-                    new_class_string2 = colorCoding(cnt.get('min',0), cnt.get('max',0))
+                    new_class_string2 = colorCoding(band1.get('min',0), band1.get('max',0))
                 else: 
                     if not cf.startswith("/"):
                         cf = os.path.join(dir, sf)
@@ -157,9 +160,10 @@ def mapForDir(dir, dir_out):
 
         mappyfile.save(mf, os.path.join(dir_out, cnf['name'] + ".map"), indent=4, spacer=' ', quote='"', newlinechar='\n',
                        end_comment=False, align_values=False)
-    
+ 
 def colorCoding(min,max):
     rng = max - min
+    print(rng)
     if rng > 0:
         sgmt = rng/8
         cur = min

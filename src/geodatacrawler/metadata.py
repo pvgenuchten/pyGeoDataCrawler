@@ -26,6 +26,7 @@ GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
 VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'xls']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 
+baseurl = "https://dev-s4a-webdav.containers.wurnet.nl/"
 
 def indexFile(fname):
     # createEncodedTempFile(fname)
@@ -75,7 +76,6 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
 
     # core metadata gets populated by merging the index.yaml content from parent folders
     coreMetadata = {}
-
 
     processPath(dir, coreMetadata, mode, dbtype, dir_out, dir_out_mode)
 
@@ -134,6 +134,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                             print('Failed to dump yaml:',e)
                     elif mode=='export':
                         #try:
+
                             with open(os.path.join(yf), mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 print('cnf:',cnf)
@@ -145,6 +146,20 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     #load yml as mcf
                                     print(cnf)
                                     md = read_mcf(cnf)
+                                    if not 'metadata' in md.keys():
+                                        md['metadata'] = {}
+                                    if not 'identifier' in md['metadata'].keys() or not md['metadata']['identifier']:
+                                        md['metadata']['identifier'] = base
+                                    if not 'distribution' in md.keys():
+                                        md['distribution'] = {}
+                                    md['distribution'][base] = {
+                                        "url": baseurl + str(file),
+                                        "type": "WWW:LINK",
+                                        "rel": "canonical",
+                                        "name": base,
+                                        "description":"",
+                                        "function": "download"
+                                    }
                                     #yaml to iso/dcat
                                     if schemaPath and os.path.exists(schemaPath):
                                         print('Using schema',schemaPath)
@@ -197,6 +212,7 @@ def insert_or_update(content, db, dbtype):
     finally:
         if conn:
             conn.close()
+
     return True
     # elif index = postgis
 

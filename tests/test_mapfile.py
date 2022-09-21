@@ -5,3 +5,4 @@ def test_colorCoding():
     assert clsstr.find('2 - 3') > -1
     clsstr = colorCoding(10,2)
     assert clsstr == ""
+
