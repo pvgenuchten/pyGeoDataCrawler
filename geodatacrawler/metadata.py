@@ -97,38 +97,38 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 fn = base.split('/').pop()
                 if extension.lower() in ["yml","yaml"] and fn != "index" and mode == "export":
                     ### export a file
-                    #try:
-                    with open(fname, mode="r", encoding="utf-8") as f:
-                        cnf = yaml.load(f, Loader=SafeLoader)
-                        if not cnf:
-                            cnf = { 'metadata':{ 'identifier': fn } }
-                        elif not cnf['metadata']: 
-                            cnf['metadata'] = { 'identifier': fn }
-                        elif not cnf['metadata']['identifier']:
-                            cnf['metadata']['identifier'] = fn
-                        target = coreMetadata.copy()
-                        dict_merge(target,cnf)
-                        md = read_mcf(target)
-                        if not 'distribution' in md.keys():
-                            md['distribution'] = { 'self': {'url': 'http://example.com', 'type': 'WWW:LINK'}}
-                        #yaml to iso/dcat
-                        if schemaPath and os.path.exists(schemaPath):
-                            xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
-                        else:
-                            iso_os = ISO19139OutputSchema()
-                            xml_string = iso_os.write(md)
-                        if dbtype == 'sqlite' or dbtype=='postgres':
-                            insert_or_update(coreMetadata, dir_out)
-                        elif dbtype == "path":
-                            if dir_out_mode == "flat":
-                                pth = os.path.join(dir_out,md['metadata']['identifier']+'.xml')
+                    try:
+                        with open(fname, mode="r", encoding="utf-8") as f:
+                            cnf = yaml.load(f, Loader=SafeLoader)
+                            if not cnf:
+                                cnf = { 'metadata':{ 'identifier': fn } }
+                            elif not cnf['metadata']: 
+                                cnf['metadata'] = { 'identifier': fn }
+                            elif not cnf['metadata']['identifier']:
+                                cnf['metadata']['identifier'] = fn
+                            target = coreMetadata.copy()
+                            dict_merge(target,cnf)
+                            md = read_mcf(target)
+                            if not 'distribution' in md.keys():
+                                md['distribution'] = { 'self': {'url': 'http://example.com', 'type': 'WWW:LINK'}}
+                            #yaml to iso/dcat
+                            if schemaPath and os.path.exists(schemaPath):
+                                xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
                             else:
-                                pth = os.path.join(target_path,os.sep,md['metadata']['identifier']+'.xml')
-                            with open(pth, 'w+') as ff:
-                                ff.write(xml_string)
-                                print('iso19139 xml generated at '+pth)    
-                    #except Exception as e:
-                    #    print('Failed to create xml:',target_path,os.sep,base+'.xml',e)
+                                iso_os = ISO19139OutputSchema()
+                                xml_string = iso_os.write(md)
+                            if dbtype == 'sqlite' or dbtype=='postgres':
+                                insert_or_update(coreMetadata, dir_out)
+                            elif dbtype == "path":
+                                if dir_out_mode == "flat":
+                                    pth = os.path.join(dir_out,md['metadata']['identifier']+'.xml')
+                                else:
+                                    pth = os.path.join(target_path,os.sep,md['metadata']['identifier']+'.xml')
+                                with open(pth, 'w+') as ff:
+                                    ff.write(xml_string)
+                                    print('iso19139 xml generated at '+pth)    
+                    except Exception as e:
+                        print('Failed to create xml:',target_path,os.sep,base+'.xml',e)
                 elif extension.lower() in SPATIAL_FILE_TYPES:
                     print ('Indexing file ' + fname)
                     yf = os.path.join(base+'.yml')
@@ -213,7 +213,6 @@ def asPGM(dct):
     return exp
 
 def merge_folder_metadata(coreMetadata, path, mode):    
-
     # if dir has index.yml merge it to parent
     print('merging',path,'index.yml',coreMetadata)
     f = os.path.join(path,'index.yml')
@@ -222,9 +221,11 @@ def merge_folder_metadata(coreMetadata, path, mode):
         prvPath = path
         with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
             pathMetadata = yaml.load(yf, Loader=SafeLoader)
-            if pathMetadata:
-                pathMetadata.pop('index', '')
-                pathMetadata.pop('mode', '')
+            if pathMetadata and pathMetadata.items():
+                if 'index' in pathMetadata.items():
+                    pathMetadata.pop('index')
+                if 'mode' in pathMetadata.items():
+                    pathMetadata.pop('mode')
                 dict_merge(coreMetadata, pathMetadata)
             return coreMetadata
     else:
