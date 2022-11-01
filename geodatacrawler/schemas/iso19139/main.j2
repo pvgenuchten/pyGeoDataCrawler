@@ -19,7 +19,7 @@
     <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['metadata']['hierarchylevel'] }}">{{ record['metadata']['hierarchylevel'] }}</gmd:MD_ScopeCode>
   </gmd:hierarchyLevel>
   {% for key, value in record['contact'].items() %}
-  {% if key not in ['distributor', 'pointOfContact'] %}
+  {% if key not in ['distributor', 'pointOfContact'] and value %}
   <gmd:contact>
     {% set contact = value %}
     {% set role = key %}
@@ -76,50 +76,9 @@
     <gmd:MD_ReferenceSystem>
       <gmd:referenceSystemIdentifier>
         <gmd:RS_Identifier>
-          <gmd:authority>
-            <gmd:CI_Citation>
-              <gmd:title>
-                <gco:CharacterString>European Petroleum Survey Group (EPSG) Geodetic Parameter Registry</gco:CharacterString>
-              </gmd:title>
-              <gmd:date>
-                <gmd:CI_Date>
-                  <gmd:date>
-                    <gco:Date>2008-11-12</gco:Date>
-                  </gmd:date>
-                  <gmd:dateType>
-                    <gmd:CI_DateTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#CI_DateTypeCode" codeSpace="ISOTC211/19115" codeListValue="publication">publication</gmd:CI_DateTypeCode>
-                  </gmd:dateType>
-                </gmd:CI_Date>
-              </gmd:date>
-              <gmd:citedResponsibleParty>
-                <gmd:CI_ResponsibleParty>
-                  <gmd:organisationName>
-                    <gco:CharacterString>European Petroleum Survey Group</gco:CharacterString>
-                  </gmd:organisationName>
-                  <gmd:contactInfo>
-                    <gmd:CI_Contact>
-                      <gmd:onlineResource>
-                        <gmd:CI_OnlineResource>
-                          <gmd:linkage>
-                            <gmd:URL>http://www.epsg-registry.org</gmd:URL>
-                          </gmd:linkage>
-                        </gmd:CI_OnlineResource>
-                      </gmd:onlineResource>
-                    </gmd:CI_Contact>
-                  </gmd:contactInfo>
-                  <gmd:role>
-                    <gmd:CI_RoleCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#CI_RoleCode" codeSpace="ISOTC211/19115" codeListValue="originator">originator</gmd:CI_RoleCode>
-                  </gmd:role>
-                </gmd:CI_ResponsibleParty>
-              </gmd:citedResponsibleParty>
-            </gmd:CI_Citation>
-          </gmd:authority>
           <gmd:code>
             <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ record['identification']['extents']['spatial'][0]['crs'] }}</gco:CharacterString>
           </gmd:code>
-          <gmd:version>
-            <gco:CharacterString>6.18.3</gco:CharacterString>
-          </gmd:version>
         </gmd:RS_Identifier>
       </gmd:referenceSystemIdentifier>
     </gmd:MD_ReferenceSystem>
@@ -155,7 +114,7 @@
       <gmd:status>
         <gmd:MD_ProgressCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ProgressCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['status'] }}">{{ record['identification']['status'] }}</gmd:MD_ProgressCode>
       </gmd:status>
-      {% if 'pointOfContact' in record['contact'] %}
+      {% if 'pointOfContact' in record['contact'].items() and record['contact']['pointOfContact'] %}
       {% set contact = record['contact']['pointOfContact'] %}
       {% set role = 'pointOfContact' %}
       <gmd:pointOfContact>
