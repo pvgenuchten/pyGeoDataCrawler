@@ -1,4 +1,4 @@
-FROM geopython/pygeoapi:latest
+FROM harbor.containers.wurnet.nl/proxy-cache/geopython/pygeoapi@sha256:c3b3a7ade1ea4054c3d8e23c7c83275d17f3707bac7735b8ba9d96fb4c9605f3
 
 # ARGS
 ARG TIMEZONE="Europe/Amsterdam"
@@ -34,6 +34,7 @@ RUN apt --no-install-recommends install -y software-properties-common
 #RUN apt --no-install-recommends install -y python3.9 python3-pip
 RUN pip install poetry pycsw
 RUN poetry run pip install GDAL==3.4.3
-RUN poetry add GDAL==3.4.3
+RUN poetry update GDAL==3.4.3
+RUN poetry install
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]
