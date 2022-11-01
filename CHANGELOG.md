@@ -1,3 +1,10 @@
+## [1.0.3](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.2...1.0.3) (2022-11-01)
+
+
+### Bug Fixes
+
+* typo in pop ([e6fbbbf](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/e6fbbbf0622be7a874b82ce52571c7f55cdf4fb5))
+
 ## [1.0.2](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.1...1.0.2) (2022-11-01)
 
 
