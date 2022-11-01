@@ -1,3 +1,10 @@
+## [1.0.2](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.1...1.0.2) (2022-11-01)
+
+
+### Bug Fixes
+
+* harbor can only have lower case ([b7cc117](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/b7cc1172c14cec77946a03a4093bf1a3f058911e))
+
 ## [1.0.1](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.0...1.0.1) (2022-11-01)
 
 
