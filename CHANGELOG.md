@@ -1,3 +1,10 @@
+## [1.0.4](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.3...1.0.4) (2022-11-01)
+
+
+### Bug Fixes
+
+* items() does not return a list, keys() does ([83d241e](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/83d241e902a5a54966377ddcc5b66896d329c607))
+
 ## [1.0.3](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.2...1.0.3) (2022-11-01)
 
 
