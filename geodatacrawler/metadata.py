@@ -196,11 +196,11 @@ def asPGM(dct):
         if not k in exp.keys():
             exp[k] = {}
 
-    exp['metadata']['identifier'] = dct.get('identifier',dct['name'])
+    exp['metadata']['identifier'] = dct.get('identifier',dct.get('name',''))
     exp['metadata']['datestamp'] = datetime.date.today()
     exp['spatial']['datatype'] = dct.get('datatype','')
     exp['spatial']['geomtype'] = dct.get('geomtype','')
-    exp['identification']['title'] = { 'en': dct['name'] } 
+    exp['identification']['title'] = dct.get('name','')
     exp['identification']['dates'] = { 'creation': dct.get('date',datetime.date.today()) }
     if 'extents' not in exp['identification'].keys():
         exp['identification']['extents'] = {}
@@ -221,10 +221,10 @@ def merge_folder_metadata(coreMetadata, path, mode):
         prvPath = path
         with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
             pathMetadata = yaml.load(yf, Loader=SafeLoader)
-            if pathMetadata and pathMetadata.items():
-                if 'index' in pathMetadata.items():
+            if pathMetadata and isinstance(pathMetadata, dict):
+                if 'index' in pathMetadata.keys():
                     pathMetadata.pop('index')
-                if 'mode' in pathMetadata.items():
+                if 'mode' in pathMetadata.keys():
                     pathMetadata.pop('mode')
                 dict_merge(coreMetadata, pathMetadata)
             return coreMetadata
