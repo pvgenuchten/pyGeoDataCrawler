@@ -1,4 +1,8 @@
-FROM harbor.containers.wurnet.nl/proxy-cache/geopython/pygeoapi@sha256:c3b3a7ade1ea4054c3d8e23c7c83275d17f3707bac7735b8ba9d96fb4c9605f3
+FROM harbor.containers.wurnet.nl/isric/pycsw:2.8.0
+#locally, build pcsw image first as docker build -t isric/pycsw .
+#FROM isric/pycsw:latest
+
+USER root
 
 # ARGS
 ARG TIMEZONE="Europe/Amsterdam"
@@ -28,13 +32,11 @@ RUN \
 
 COPY . /pyGeoDataCrawler
 WORKDIR /pyGeoDataCrawler 
-RUN rm -Rf /pygeoapi
 RUN apt --no-install-recommends install -y software-properties-common
-#RUN add-apt-repository ppa:deadsnakes/ppa
-#RUN apt --no-install-recommends install -y python3.9 python3-pip
-RUN pip install poetry pycsw
+RUN pip install poetry
+RUN gdal-config --version
 RUN poetry run pip install GDAL==3.4.3
-RUN poetry update GDAL==3.4.3
+#RUN poetry add gdal==3.4.3
 RUN poetry install
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]

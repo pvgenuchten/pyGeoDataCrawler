@@ -214,7 +214,7 @@ def asPGM(dct):
 
 def merge_folder_metadata(coreMetadata, path, mode):    
     # if dir has index.yml merge it to parent
-    print('merging',path,'index.yml',coreMetadata)
+    # print('merging',path,'index.yml',coreMetadata)
     f = os.path.join(path,'index.yml')
     if os.path.exists(f):   
         print ('Indexing path ' + path)
