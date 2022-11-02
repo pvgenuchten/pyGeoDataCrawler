@@ -89,6 +89,12 @@ GDAL 3.3.2, released 2021/09/01
 >> exit
 ```
 
+## Docker (used in ci-cd)
+
+In order to synchronise record-loading with record-hosting, we use the isric-pycsw image as a base.
+On top of it python poetry is loaded with the pygeodatacrawler code. this is used as a ci-cd container for example 
+in the lsc-hubs/dataset-inventarisation project
+
 
 ## WSL-webdav specific
 
