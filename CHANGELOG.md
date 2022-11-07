@@ -1,3 +1,10 @@
+## [1.0.7](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.6...1.0.7) (2022-11-07)
+
+
+### Bug Fixes
+
+* add all contacts ([179286f](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/179286f38722c11c3ed3de919f6a196185ed1259))
+
 ## [1.0.6](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.5...1.0.6) (2022-11-07)
 
 
