@@ -116,10 +116,12 @@
       <gmd:status>
         <gmd:MD_ProgressCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ProgressCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['status'] }}">{{ record['identification']['status'] }}</gmd:MD_ProgressCode>
       </gmd:status>
+      {% if record['contact'] %}
       {% for role, contact in record['contact'].items()  %}
       <gmd:pointOfContact>
       {% include "contact.j2" %}
       </gmd:pointOfContact>
+      {% endfor %}
       {% endif %}
       <gmd:resourceMaintenance>
         <gmd:MD_MaintenanceInformation>
