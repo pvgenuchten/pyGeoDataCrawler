@@ -1,3 +1,10 @@
+## [1.0.8](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.7...1.0.8) (2022-11-07)
+
+
+### Bug Fixes
+
+* close for loop ([8f3d9c3](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/8f3d9c3e09b44da8e988f72fd3f76183ac747063))
+
 ## [1.0.7](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.6...1.0.7) (2022-11-07)
 
 
