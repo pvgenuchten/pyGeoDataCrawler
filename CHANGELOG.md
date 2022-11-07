@@ -1,3 +1,10 @@
+## [1.0.6](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.5...1.0.6) (2022-11-07)
+
+
+### Bug Fixes
+
+* restore record contact ([ee6409e](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/ee6409e67fed9b635cfb8cdc4244d2f78e1af208))
+
 ## [1.0.5](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.4...1.0.5) (2022-11-02)
 
 
