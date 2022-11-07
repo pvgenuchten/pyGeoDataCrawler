@@ -116,9 +116,7 @@
       <gmd:status>
         <gmd:MD_ProgressCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ProgressCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['status'] }}">{{ record['identification']['status'] }}</gmd:MD_ProgressCode>
       </gmd:status>
-      {% if 'pointOfContact' in record['contact'].items() and record['contact']['pointOfContact'] %}
-      {% set contact = record['contact']['pointOfContact'] %}
-      {% set role = 'pointOfContact' %}
+      {% for role, contact in record['contact'].items()  %}
       <gmd:pointOfContact>
       {% include "contact.j2" %}
       </gmd:pointOfContact>
