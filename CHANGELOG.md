@@ -1,3 +1,10 @@
+## [1.0.5](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.4...1.0.5) (2022-11-02)
+
+
+### Bug Fixes
+
+* use a ubuntu based pycsw image as a source ([f80e9f5](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/f80e9f55b26d650d5710cd14efa67b1593063985))
+
 ## [1.0.4](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.3...1.0.4) (2022-11-01)
 
 
