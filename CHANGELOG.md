@@ -1,3 +1,10 @@
+## [1.0.9](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.8...1.0.9) (2022-11-10)
+
+
+### Bug Fixes
+
+* update to latest pycsw image 2.9.0 ([16a0751](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/16a0751cf29f1307a3226a844b0a2089dcf8e65f))
+
 ## [1.0.8](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.7...1.0.8) (2022-11-07)
 
 
