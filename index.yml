@@ -1,0 +1,40 @@
+mcf:
+    version: 1.0
+
+metadata:
+    language: en
+    charset: utf8
+    hierarchylevel: dataset
+
+spatial:
+    datatype: unknown
+    geomtype: unknown
+
+identification:
+    language: eng
+    charset: utf8
+    title:
+    abstract:
+    dates:
+    keywords:
+        default:
+            keywords:
+    topiccategory:
+        - geoscientificInformation
+    extents:
+        spatial:
+            - bbox:
+              crs: 4326
+    fees: None
+    accessconstraints: otherRestrictions
+    rights: None
+    status: onGoing
+    maintenancefrequency: continual
+
+contact:
+
+dataquality:
+    scope:
+        level: dataset
+    lineage:
+        statement: 

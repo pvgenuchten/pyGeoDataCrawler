@@ -26,7 +26,7 @@ def indexSpatialFile(fname, extension):
     try:
         content = {
             'identifier': os.path.splitext(fname)[0].replace('/','-'),
-            'name': os.path.splitext(os.path.basename(fname))[0],
+            'title': os.path.splitext(os.path.basename(fname))[0],
             'url': fname,
             'date': time.ctime(os.path.getmtime(fname))
         }
@@ -130,18 +130,19 @@ def dict_merge(dct, merge_dct):
     :param merge_dct: dct merged into dct
     :returns: None
     """
-    if not isinstance(merge_dct, str):
+    if merge_dct and not isinstance(merge_dct, str):
         for k, v in merge_dct.items():
             try:
                 if (k in dct and isinstance(dct[k], dict)):
                     dict_merge(dct[k], merge_dct[k])
                 else:
-                    if k in dct and dct[k] and k in merge_dct:
+                    if k in dct and dct[k] and not v:
                         pass
                     else:
                         dct[k] = merge_dct[k]
             except Exception as e:
                 print(e,"; k:",k,"; v:",v)
+
 
 def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
     try:
@@ -155,7 +156,7 @@ def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
             return "epsg:42106"
         print('Unable to identify: ' + wkt)
     else:
-        return "epsg:" + epsg 
+        return "epsg:" + str(epsg) 
 
 def reprojectBounds(bnds,src,trg):
     if src and len(src) > 0:

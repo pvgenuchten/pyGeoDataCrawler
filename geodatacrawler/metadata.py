@@ -75,27 +75,9 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
             print("postgis not supported")
 
     # core metadata gets populated by merging the index.yaml content from parent folders
-    coreMetadata = {}
+    initialMetadata = load_default_metadata(mode)
 
-    processPath(dir, coreMetadata, mode, dbtype, dir_out, dir_out_mode)
-
-def merge_folder_metadata(coreMetadata, path):    
-
-    # if dir has index.yaml merge it to parent
-    print('merging',path,'index.yaml')
-    f = os.path.join(path,'index.yaml')
-    if os.path.exists(f):   
-        print ('Indexing path ' + path)
-        prvPath = path
-        with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
-            pathMetadata = yaml.load(yf, Loader=SafeLoader)
-            pathMetadata.pop('index')
-            pathMetadata.pop('mode')
-            dict_merge(pathMetadata, coreMetadata)
-            return pathMetadata
-    else:
-        print('Index '+f+' does not exist') # create it?
-        return coreMetadata
+    processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode)
 
 def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode):
     if mode == 'export':
@@ -105,15 +87,51 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
     for file in Path(target_path).iterdir():
         if file.is_dir():
             # go one level deeper
-            processPath(str(file), coreMetadata, mode, dbtype, dir_out, dir_out_mode)
+            print('process path: '+ str(file))
+            processPath(str(file), coreMetadata.copy(), mode, dbtype, dir_out, dir_out_mode)
         else:
             # process the file
             fname = str(file)
             if '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
-                if extension.lower() in SPATIAL_FILE_TYPES:
+                fn = base.split('/').pop()
+                if extension.lower() in ["yml","yaml"] and fn != "index" and mode == "export":
+                    ### export a file
+                    try:
+                        with open(fname, mode="r", encoding="utf-8") as f:
+                            cnf = yaml.load(f, Loader=SafeLoader)
+                            if not cnf:
+                                cnf = { 'metadata':{ 'identifier': fn } }
+                            elif not cnf['metadata']: 
+                                cnf['metadata'] = { 'identifier': fn }
+                            elif not cnf['metadata']['identifier']:
+                                cnf['metadata']['identifier'] = fn
+                            target = coreMetadata.copy()
+                            dict_merge(target,cnf)
+                            md = read_mcf(target)
+                            if not 'distribution' in md.keys():
+                                md['distribution'] = { 'self': {'url': 'http://example.com', 'type': 'WWW:LINK'}}
+                            #yaml to iso/dcat
+                            if schemaPath and os.path.exists(schemaPath):
+                                xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
+                            else:
+                                iso_os = ISO19139OutputSchema()
+                                xml_string = iso_os.write(md)
+                            if dbtype == 'sqlite' or dbtype=='postgres':
+                                insert_or_update(coreMetadata, dir_out)
+                            elif dbtype == "path":
+                                if dir_out_mode == "flat":
+                                    pth = os.path.join(dir_out,md['metadata']['identifier']+'.xml')
+                                else:
+                                    pth = os.path.join(target_path,os.sep,md['metadata']['identifier']+'.xml')
+                                with open(pth, 'w+') as ff:
+                                    ff.write(xml_string)
+                                    print('iso19139 xml generated at '+pth)    
+                    except Exception as e:
+                        print('Failed to create xml:',target_path,os.sep,base+'.xml',e)
+                elif extension.lower() in SPATIAL_FILE_TYPES:
                     print ('Indexing file ' + fname)
-                    yf = os.path.join(base+'.yaml')
+                    yf = os.path.join(base+'.yml')
                     if (mode=='update' or (not os.path.exists(yf) and mode=='init')):
                         # mode init for spatial files without metadata or update
                         cnt = indexSpatialFile(fname, extension) 
@@ -132,52 +150,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 yaml.dump(md, f, sort_keys=False)
                         except Exception as e:
                             print('Failed to dump yaml:',e)
-                    elif mode=='export':
-                        #try:
-
-                            with open(os.path.join(yf), mode="r", encoding="utf-8") as f:
-                                cnf = yaml.load(f, Loader=SafeLoader)
-                                print('cnf:',cnf)
-                                print('core:',coreMetadata)
-                                dict_merge(coreMetadata,cnf)
-                                if dbtype == 'sqlite' or dbtype=='postgres':
-                                    insert_or_update(cnf, dir_out)
-                                elif dbtype == "path":
-                                    #load yml as mcf
-                                    print(cnf)
-                                    md = read_mcf(cnf)
-                                    if not 'metadata' in md.keys():
-                                        md['metadata'] = {}
-                                    if not 'identifier' in md['metadata'].keys() or not md['metadata']['identifier']:
-                                        md['metadata']['identifier'] = base
-                                    if not 'distribution' in md.keys():
-                                        md['distribution'] = {}
-                                    md['distribution'][base] = {
-                                        "url": baseurl + str(file),
-                                        "type": "WWW:LINK",
-                                        "rel": "canonical",
-                                        "name": base,
-                                        "description":"",
-                                        "function": "download"
-                                    }
-                                    #yaml to iso/dcat
-                                    if schemaPath and os.path.exists(schemaPath):
-                                        print('Using schema',schemaPath)
-                                        xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
-                                    else:
-                                        print('Using default iso19139 schema')
-                                        iso_os = ISO19139OutputSchema()
-                                        xml_string = iso_os.write(md)                              
-                                    if dir_out_mode == "flat":
-                                        pth = os.path.join(dir_out,cnf['metadata']['identifier']+'.xml')
-                                    else:
-                                        pth = os.path.join(path,base+'.xml')
-                                    print("write to file: " + pth)
-                                    with open(pth, 'w+') as ff:
-                                        ff.write(xml_string)
-                                        print('iso19139 xml generated at '+pth)
-                        #except Exception as e:
-                        #    print('Failed to create xml:',e)
                 else:
                     None
                     # print('Skipping {}, not approved file type: {}'.format(fname, extension))
@@ -224,12 +196,12 @@ def asPGM(dct):
         if not k in exp.keys():
             exp[k] = {}
 
-    exp['metadata']['identifier'] = dct.get('identifier',dct['name'])
-    exp['metadata']['datestamp'] = datetime.datetime.now()
+    exp['metadata']['identifier'] = dct.get('identifier',dct.get('name',''))
+    exp['metadata']['datestamp'] = datetime.date.today()
     exp['spatial']['datatype'] = dct.get('datatype','')
     exp['spatial']['geomtype'] = dct.get('geomtype','')
-    exp['identification']['title'] = { 'en': dct['name'] } 
-    exp['identification']['dates'] = { 'creation': dct.get('date',datetime.datetime.now()) }
+    exp['identification']['title'] = dct.get('name','')
+    exp['identification']['dates'] = { 'creation': dct.get('date',datetime.date.today()) }
     if 'extents' not in exp['identification'].keys():
         exp['identification']['extents'] = {}
     exp['identification']['extents']['spatial'] = [
@@ -239,6 +211,31 @@ def asPGM(dct):
     #exp['distribution']['www']['url'] = rootUrl+dct['url'] 
     #exp['distribution']['www']['name']['en'] = dct['name'] 
     return exp
+
+def merge_folder_metadata(coreMetadata, path, mode):    
+    # if dir has index.yml merge it to parent
+    # print('merging',path,'index.yml',coreMetadata)
+    f = os.path.join(path,'index.yml')
+    if os.path.exists(f):   
+        print ('Indexing path ' + path)
+        prvPath = path
+        with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
+            pathMetadata = yaml.load(yf, Loader=SafeLoader)
+            if pathMetadata and isinstance(pathMetadata, dict):
+                if 'index' in pathMetadata.keys():
+                    pathMetadata.pop('index')
+                if 'mode' in pathMetadata.keys():
+                    pathMetadata.pop('mode')
+                dict_merge(coreMetadata, pathMetadata)
+            return coreMetadata
+    else:
+        return coreMetadata
+
+def load_default_metadata(mode):
+    initial = merge_folder_metadata({},'.',mode)
+    initial['identification']['dates'] = {"publication": datetime.date.today()}
+    initial['metadata']['datestamp'] = datetime.date.today()
+    return initial
 
 def createIndexIfDoesntExist(db):
     if path.exists(db):
