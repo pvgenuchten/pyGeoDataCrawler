@@ -4,6 +4,7 @@ from yaml.loader import SafeLoader
 import os
 import sqlite3
 from os import path
+from copy import deepcopy
 from sqlite3 import Error
 import datetime
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
@@ -13,9 +14,9 @@ from pathlib import Path
 
 from . import templates
 
-rootUrl = os.getenv('pgdc_root')
-if not rootUrl:
-    rootUrl = 'http://example.com/'
+webdavUrl = os.getenv('pgdc_webdav_url')
+if not webdavUrl:
+    webdavUrl = 'http://example.com/'
 schemaPath = os.getenv('pgdc_schema_path')
 if not schemaPath:
     schemaPath = "/pyGeoDataCrawler/src/geodatacrawler/schemas"
@@ -25,8 +26,6 @@ INDEX_FILE_TYPES = ['html', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xml', 'json']
 GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
 VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'xls']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
-
-baseurl = "https://dev-s4a-webdav.containers.wurnet.nl/"
 
 def indexFile(fname):
     # createEncodedTempFile(fname)
@@ -85,10 +84,12 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
     else:
         coreMetadata = parentMetadata
     for file in Path(target_path).iterdir():
-        if file.is_dir():
+        fname = str(file).split(os.sep).pop()
+        if file.is_dir() and not fname.startswith('.'):
             # go one level deeper
             print('process path: '+ str(file))
-            processPath(str(file), coreMetadata.copy(), mode, dbtype, dir_out, dir_out_mode)
+            
+            processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode)
         else:
             # process the file
             fname = str(file)
@@ -100,17 +101,24 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     try:
                         with open(fname, mode="r", encoding="utf-8") as f:
                             cnf = yaml.load(f, Loader=SafeLoader)
+                            print(cnf)
                             if not cnf:
                                 cnf = { 'metadata':{ 'identifier': fn } }
-                            elif not cnf['metadata']: 
+                            elif 'metadata' not in cnf.keys() or cnf['metadata'] is None: 
                                 cnf['metadata'] = { 'identifier': fn }
-                            elif not cnf['metadata']['identifier']:
+                            elif 'identifier' not in cnf['metadata'].keys() or cnf['metadata']['identifier'] in [None,""]:
                                 cnf['metadata']['identifier'] = fn
-                            target = coreMetadata.copy()
+                            target = deepcopy(coreMetadata)
                             dict_merge(target,cnf)
+                            if 'robot' in target.keys():
+                                target.pop('robot')
                             md = read_mcf(target)
                             if not 'distribution' in md.keys():
-                                md['distribution'] = { 'self': {'url': 'http://example.com', 'type': 'WWW:LINK'}}
+                                md['distribution'] = {}
+                            if not 'webdav' in md['distribution'].keys(): # add a flag to indicate dav links should not be included? -> remove webdav
+                                md['distribution'] = { 'webdav': {'url': webdavUrl + '/' +  str(file), 'name': base, 'type': 'WWW:LINK'}}
+                            if md['contact'] is None or len(md['contact'].keys()) == 0:
+                                md['contact'] = {'example':{'organization':'Unknown'}}
                             #yaml to iso/dcat
                             if schemaPath and os.path.exists(schemaPath):
                                 xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
@@ -208,7 +216,7 @@ def asPGM(dct):
         {'bbox': dct.get('bounds',[]), 
          'crs' : dct.get('crs','4326')}]
     exp['content_info'] = dct.get('content_info',{}) 
-    #exp['distribution']['www']['url'] = rootUrl+dct['url'] 
+    #exp['distribution']['www']['url'] = webdavUrl+dct['url'] 
     #exp['distribution']['www']['name']['en'] = dct['name'] 
     return exp
 
@@ -222,10 +230,6 @@ def merge_folder_metadata(coreMetadata, path, mode):
         with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
             pathMetadata = yaml.load(yf, Loader=SafeLoader)
             if pathMetadata and isinstance(pathMetadata, dict):
-                if 'index' in pathMetadata.keys():
-                    pathMetadata.pop('index')
-                if 'mode' in pathMetadata.keys():
-                    pathMetadata.pop('mode')
                 dict_merge(coreMetadata, pathMetadata)
             return coreMetadata
     else:

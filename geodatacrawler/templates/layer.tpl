@@ -5,17 +5,14 @@ LAYER
     PROJECTION
         'init={projection}'
     END
-    EXTENT {extent}
+    EXTENT '{extent}'
     STATUS on
     Template '{template}'
 
-    VALIDATION
-      "ows_url" "(\b(https?|ftp|file)://)?[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]"
-    END
     METADATA
-        'ows_onlineresource'         "%ows_url%"
-        'ows_title'                 '{title}'
-        'ows_abstract'              '{abstract}'
+        'ows_onlineresource'         '{owsurl}'
+        'ows_title'                 {title}
+        'ows_abstract'              {abstract}
         'ows_extent'                '{extent}'
         'ows_srs'                   '{projection} {projections}'
         'ows_metadataurl_type'      'TC211'
