@@ -101,7 +101,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     try:
                         with open(fname, mode="r", encoding="utf-8") as f:
                             cnf = yaml.load(f, Loader=SafeLoader)
-                            print(cnf)
                             if not cnf:
                                 cnf = { 'metadata':{ 'identifier': fn } }
                             elif 'metadata' not in cnf.keys() or cnf['metadata'] is None: 
@@ -110,15 +109,16 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 cnf['metadata']['identifier'] = fn
                             target = deepcopy(coreMetadata)
                             dict_merge(target,cnf)
+                            if 'distribution' not in target.keys() or target['distribution'] is None:
+                                target['distribution'] = {}
+                            if 'webdav' not in target['distribution'].keys() or target['distribution']['webdav'] is None:
+                                # add a flag to indicate dav links should not be included? -> remove webdav
+                                target['distribution']['webdav']= {'url': webdavUrl + '/' +  fn, 'name': fn, 'type': 'WWW:LINK'}
+                            if target['contact'] is None or len(target['contact'].keys()) == 0:
+                                target['contact'] = {'example':{'organization':'Unknown'}}
                             if 'robot' in target.keys():
                                 target.pop('robot')
                             md = read_mcf(target)
-                            if not 'distribution' in md.keys():
-                                md['distribution'] = {}
-                            if not 'webdav' in md['distribution'].keys(): # add a flag to indicate dav links should not be included? -> remove webdav
-                                md['distribution'] = { 'webdav': {'url': webdavUrl + '/' +  str(file), 'name': base, 'type': 'WWW:LINK'}}
-                            if md['contact'] is None or len(md['contact'].keys()) == 0:
-                                md['contact'] = {'example':{'organization':'Unknown'}}
                             #yaml to iso/dcat
                             if schemaPath and os.path.exists(schemaPath):
                                 xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
@@ -126,7 +126,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 iso_os = ISO19139OutputSchema()
                                 xml_string = iso_os.write(md)
                             if dbtype == 'sqlite' or dbtype=='postgres':
-                                insert_or_update(coreMetadata, dir_out)
+                                insert_or_update(target, dir_out)
                             elif dbtype == "path":
                                 if dir_out_mode == "flat":
                                     pth = os.path.join(dir_out,md['metadata']['identifier']+'.xml')
