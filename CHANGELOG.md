@@ -1,3 +1,10 @@
+## [1.0.10](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.9...1.0.10) (2022-11-16)
+
+
+### Bug Fixes
+
+* fix some null bugs on metadata creation ([d7c9309](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/d7c9309007ee96b37317a6735aa6563941b38148))
+
 ## [1.0.9](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.8...1.0.9) (2022-11-10)
 
 
