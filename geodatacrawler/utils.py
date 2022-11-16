@@ -58,7 +58,6 @@ def indexSpatialFile(fname, extension):
         mn=srcband.GetMinimum()
         mx=srcband.GetMaximum()
         
-        print(mn,mx)
         content['bounds'] = [ulx, lry, lrx, uly]
         content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
         
@@ -77,8 +76,6 @@ def indexSpatialFile(fname, extension):
                 }]
             }
         content['meta'] = d.GetMetadata()
-
-        print(content)
 
         d = None
 
