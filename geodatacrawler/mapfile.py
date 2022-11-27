@@ -263,7 +263,7 @@ def addLink(type, layer, file, relPath, map, config):
         if 'distribution' not in orig.keys():
             orig['distribution'] = {}
         orig['distribution'][type.split(':').pop()] = {
-            'url': config['msUrl'] + relPath+'?service='+type.split(':').pop()+'&request=GetCapabilities',
+            'url': config['msUrl'] + relPath+'?service='+type.split(':').pop()+'&amp;request=GetCapabilities',
             'type': type,
             'name': layer,
             'description': ''

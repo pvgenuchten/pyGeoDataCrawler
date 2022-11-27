@@ -9,17 +9,20 @@ from sqlite3 import Error
 import datetime
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from pygeometa.core import read_mcf, render_j2_template
-from geodatacrawler.utils import indexSpatialFile, dict_merge
+from geodatacrawler.utils import indexSpatialFile, dict_merge, isDistributionLocal, checkOWSLayer
 from pathlib import Path
+import pandas as pd
+import uuid
+from jinja2 import Environment
+import re
 
 from . import templates
 
 webdavUrl = os.getenv('pgdc_webdav_url')
-if not webdavUrl:
-    webdavUrl = 'http://example.com/'
+
 schemaPath = os.getenv('pgdc_schema_path')
 if not schemaPath:
-    schemaPath = "/pyGeoDataCrawler/src/geodatacrawler/schemas"
+    schemaPath = "/mnt/c/Users/genuc003/Projects/geopython/pyGeoDataCrawler/geodatacrawler/schemas"
 
 # for supported formats, see apache tika - http://tika.apache.org/1.4/formats.html
 INDEX_FILE_TYPES = ['html', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xml', 'json']
@@ -41,19 +44,25 @@ def indexFile(fname):
 @click.option('--dir-out', nargs=1,
               required=False, help="Directory as target for the generated files")
 @click.option('--dir-out-mode', nargs=1, required=False, help="flat|nested indicates if files in output folder are nested")
-@click.option('--mode', nargs=1, required=False, help="metadata mode init [update] [export]") 
+@click.option('--mode', nargs=1, required=False, help="metadata mode init [update] [export] [import-csv]") 
 @click.option('--dbtype', nargs=1, required=False, help="export db type path [sqlite] [postgres]")  
-@click.option('--profile', nargs=1, required=False, help="export to proflie iso19139 [dcat]")              
-@click.option('--db', nargs=1, required=False, help="db connection / path")
-def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
+@click.option('--profile', nargs=1, required=False, help="export to profile iso19139 [dcat]")   
+@click.option('--db', nargs=1, required=False, help="a db to export to")           
+@click.option('--map', nargs=1, required=False, help="a mappingfile for csv")
+@click.option('--sep', nargs=1, required=False, help="which separator is used on csv, default:,")
+@click.option('--cluster', nargs=1, required=False, help="Use a field to cluster records in a folder, default:none")
+def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cluster):
     if not dir:
         dir = "."
     if not dir_out:
         dir_out = dir
     if not dir_out_mode or dir_out_mode not in ["flat","nested"]:
         dir_out_mode = "flat"
-    if not mode or mode not in ["init","update","export"]:
+    if not mode:
         mode = "init"
+    elif  mode not in ["init","update","export","import-csv"]:
+        print('valid modes are init, update, export, import-csv')
+        exit()
     if not dbtype or dbtype not in ["path","sqlite","postgres"]:
         dbtype = "path"
     if not db:
@@ -76,7 +85,10 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db):
     # core metadata gets populated by merging the index.yaml content from parent folders
     initialMetadata = load_default_metadata(mode)
 
-    processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode)
+    if mode=='import-csv':
+        importCsv(dir, dir_out, map, sep, cluster)
+    else:
+        processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode)
 
 def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode):
     if mode == 'export':
@@ -96,75 +108,169 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
             if '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split('/').pop()
-                if extension.lower() in ["yml","yaml"] and fn != "index" and mode == "export":
-                    ### export a file
-                    try:
-                        with open(fname, mode="r", encoding="utf-8") as f:
-                            cnf = yaml.load(f, Loader=SafeLoader)
-                            if not cnf:
-                                cnf = { 'metadata':{ 'identifier': fn } }
-                            elif 'metadata' not in cnf.keys() or cnf['metadata'] is None: 
-                                cnf['metadata'] = { 'identifier': fn }
-                            elif 'identifier' not in cnf['metadata'].keys() or cnf['metadata']['identifier'] in [None,""]:
-                                cnf['metadata']['identifier'] = fn
-                            target = deepcopy(coreMetadata)
-                            dict_merge(target,cnf)
-                            if 'distribution' not in target.keys() or target['distribution'] is None:
-                                target['distribution'] = {}
-                            if 'webdav' not in target['distribution'].keys() or target['distribution']['webdav'] is None:
-                                # add a flag to indicate dav links should not be included? -> remove webdav
-                                target['distribution']['webdav']= {'url': webdavUrl + '/' +  fn, 'name': fn, 'type': 'WWW:LINK'}
-                            if target['contact'] is None or len(target['contact'].keys()) == 0:
-                                target['contact'] = {'example':{'organization':'Unknown'}}
-                            if 'robot' in target.keys():
-                                target.pop('robot')
-                            md = read_mcf(target)
-                            #yaml to iso/dcat
-                            if schemaPath and os.path.exists(schemaPath):
-                                xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
-                            else:
-                                iso_os = ISO19139OutputSchema()
-                                xml_string = iso_os.write(md)
-                            if dbtype == 'sqlite' or dbtype=='postgres':
-                                insert_or_update(target, dir_out)
-                            elif dbtype == "path":
-                                if dir_out_mode == "flat":
-                                    pth = os.path.join(dir_out,md['metadata']['identifier']+'.xml')
-                                else:
-                                    pth = os.path.join(target_path,os.sep,md['metadata']['identifier']+'.xml')
-                                with open(pth, 'w+') as ff:
-                                    ff.write(xml_string)
-                                    print('iso19139 xml generated at '+pth)    
-                    except Exception as e:
-                        print('Failed to create xml:',target_path,os.sep,base+'.xml',e)
-                elif extension.lower() in SPATIAL_FILE_TYPES:
-                    print ('Indexing file ' + fname)
-                    yf = os.path.join(base+'.yml')
-                    if (mode=='update' or (not os.path.exists(yf) and mode=='init')):
-                        # mode init for spatial files without metadata or update
-                        cnt = indexSpatialFile(fname, extension) 
-                        if (mode=='update'): # keep manual changes on the original
-                            try:
-                                with open(os.path.join(yf), mode="r", encoding="utf-8") as f:
-                                    orig = yaml.load(f, Loader=SafeLoader)
-                                    dict_merge(orig,cnt) # or should we overwrite some values from cnt explicitely?
-                                    cnt = orig
-                            except Exception as e:
-                                print('Failed to merge original:',f,e)
-                        md = asPGM(cnt)
-                        # write yf
+                if extension.lower() in ["yml","yaml"] and fn != "index":
+                    if mode == "export":
+                        ### export a file
                         try:
-                            with open(os.path.join(yf), 'w') as f:
-                                yaml.dump(md, f, sort_keys=False)
+                            with open(fname, mode="r", encoding="utf-8") as f:
+                                cnf = yaml.load(f, Loader=SafeLoader)
+                                if not cnf:
+                                    cnf = { 'metadata':{ 'identifier': fn } }
+                                elif 'metadata' not in cnf.keys() or cnf['metadata'] is None: 
+                                    cnf['metadata'] = { 'identifier': fn }
+                                elif 'identifier' not in cnf['metadata'].keys() or cnf['metadata']['identifier'] in [None,""]:
+                                    cnf['metadata']['identifier'] = fn
+                                target = deepcopy(coreMetadata)
+                                dict_merge(target,cnf)
+                                if 'distribution' not in target.keys() or target['distribution'] is None:
+                                    target['distribution'] = {}
+                                if webdavUrl:
+                                    if 'webdav' not in target['distribution'].keys() or target['distribution']['webdav'] is None:
+                                        # add a flag to indicate dav links should not be included? -> remove webdav
+                                        target['distribution']['webdav']= {'url': webdavUrl + '/' +  fn, 'name': fn, 'type': 'WWW:LINK'}
+                                if target['contact'] is None or len(target['contact'].keys()) == 0:
+                                    target['contact'] = {'example':{'organization':'Unknown'}}
+                                if 'robot' in target.keys():
+                                    target.pop('robot')
+                                md = read_mcf(target)
+                                #yaml to iso/dcat
+                                if schemaPath and os.path.exists(schemaPath):
+                                    xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
+                                else:
+                                    iso_os = ISO19139OutputSchema()
+                                    xml_string = iso_os.write(md)
+                                if dbtype == 'sqlite' or dbtype=='postgres':
+                                    insert_or_update(target, dir_out)
+                                elif dbtype == "path":
+                                    if dir_out_mode == "flat":
+                                        pth = os.path.join(dir_out,md['metadata']['identifier']+'.xml')
+                                    else:
+                                        pth = os.path.join(target_path,os.sep,md['metadata']['identifier']+'.xml')
+                                    with open(pth, 'w+') as ff:
+                                        ff.write(xml_string)
+                                        print('iso19139 xml generated at '+pth)    
+                        except Exception as e:
+                            print('Failed to create xml:',target_path,os.sep,base+'.xml',e)
+                    elif mode=='update':
+                        # a yml should already exist for each spatial file, so only check yml's, not index
+                        with open(str(file), mode="r", encoding="utf-8") as f:
+                            orig = yaml.load(f, Loader=SafeLoader)
+                        # todo: if this fails, we give a warning, or initialise the file again??
+                        if not orig:
+                            orig = {}
+                        if orig['distribution'] is None: # edge case, apparently this case is not catched with orig.get('distribution',{})
+                            orig['distribution'] = {}
+                        # evaluate if a file is attached, or is only a metadata (of a wms for example)
+                        hasFile = None
+
+                        for d,v in orig.get('distribution',{}).items():
+                            if v.get('url','') not in [None,""] and (v.get('type','').upper().startswith('OGC:') 
+                                or v.get('type','').upper() in ['WMS','WFS','WCS','WMTS']):
+                                print('check distribution:',v.get('url',''),v.get('type',''),v.get('name',''))
+                                hasFiles = checkOWSLayer(v.get('url',''),v.get('type',''),v.get('name',''), orig.get('metadata',{}).get('identifier'), orig.get('identification',{}).get('title'))
+                                if hasFiles and len(hasFiles.keys()) > 0:
+                                    hasfile = hasFiles[list(hasFiles.keys())[0]] # todo, process multiple
+                                    for k,v in hasfile.items():
+                                        if k == 'extent':
+                                            if 'extents' not in orig['identification']: orig['identification']['extents'] = {}
+                                            if 'spatial' not in orig['identification']['extents']: orig['identification']['extents']['spatial'] = []
+                                            orig['identification']['extents']['spatial'] = [v]
+                                        elif k == 'name':
+                                            orig['distribution'][d]['name'] = v
+                            # todo: process metadata links (doi/...)
+                            else:
+                                localFile = isDistributionLocal(v.get('url',''),target_path)
+                                if localFile:
+                                    hasFile = localFile
+                                    cnt = indexSpatialFile(hasFile, extension)
+                                    #merge with orig
+                                    dict_merge(orig,cnt) # or should we overwrite some values from cnt explicitely? (not title, etc)
+                        # save yf (or only if updated?)
+                        try:
+                            with open(str(file), 'w') as f:
+                                yaml.dump(orig, f, sort_keys=False)
                         except Exception as e:
                             print('Failed to dump yaml:',e)
+
+                    # mode==init
+                    elif extension.lower() in SPATIAL_FILE_TYPES:
+                        print ('Indexing file ' + fname)
+                        yf = os.path.join(base+'.yml')
+                        if not os.path.exists(yf): # only if yml not exists yet
+                            # mode init for spatial files without metadata or update
+                            cnt = indexSpatialFile(fname, extension) 
+                            
+                            md = asPGM(cnt)
+                            # write yf
+                            try:
+                                with open(os.path.join(yf), 'w') as f:
+                                    yaml.dump(md, f, sort_keys=False)
+                            except Exception as e:
+                                print('Failed to dump yaml:',e)
+                    else:
+                        None
+                        # print('Skipping {}, not approved file type: {}'.format(fname, extension))
                 else:
                     None
-                    # print('Skipping {}, not approved file type: {}'.format(fname, extension))
-            else:
-                None
-                # print('Skipping {}, no extension'.format(fname))
+                    # print('Skipping {}, no extension'.format(fname))
 
+def importCsv(dir,dir_out,map,sep,cluster):
+    if sep in [None,'']:
+        sep = ','
+    for file in Path(dir).iterdir():
+        fname = str(file).split(os.sep).pop()
+        if not file.is_dir() and fname.endswith('.csv'):
+            f,e = str(fname).rsplit('.', 1)
+            # which mapping file to use?
+            print(dir+f+'.j2')
+            if map not in [None,""] and os.path.exists(map): # incoming param
+                with open(map) as f1:
+                    map = f1.read()
+            elif os.path.exists(dir+f+'.j2'): # same name, *.tpl
+                with open(dir+f+'.j2') as f1:
+                    map = f1.read()
+            else: # default
+                map = pkg_resources.read_text(templates, 'csv.j2')
+            print(map)
+            env = Environment(extensions=['jinja2_time.TimeExtension'])
+            j2_template = env.from_string(map)
+
+            myDatasets = pd.read_csv(file, sep=sep)
+            for i, record in myDatasets.iterrows():
+                md = record.to_dict()
+                #Filter remover any None values
+                md = {k:v for k, v in md.items() if pd.notna(v)}
+                print("processing: ",md['resource title'])
+                # for each row, substiture values in a yml
+                try:    
+                    mcf = j2_template.render(md=md)
+                    try:
+                        yMcf = yaml.load(mcf, Loader=SafeLoader)
+                    except Error as e:
+                        print('Failed parsing',mcf,e)
+                except Error as e:
+                    print('Failed substituting',md,e)
+                if yMcf:
+                    # which folder to write to?
+                    fldr = dir_out
+                    if cluster not in [None,""] and cluster in md.keys():
+                        # todo, safe string, re.sub('[^A-Za-z0-9]+', '', cluster)
+                        fldr += md[cluster] + os.sep
+                    if not os.path.isdir(fldr):
+                        os.makedirs(fldr)
+                        print('folder',fldr,'created')
+                    # which id to use
+                    myid = yMcf.get('metadata',{}).get('identifier')
+                    if myid in [None,'']:
+                        myid = re.sub('[^A-Za-z0-9]+', '', yMcf.get('identification',{}).get('title',str(uuid.uuid1())))
+                        if myid == '':
+                            myid = str(uuid.uuid1());
+                        if cluster not in [None,""] and cluster in md.keys():
+                            myid = md[cluster] + '-' + myid
+                        yMcf['metadata']['identifier'] = myid
+                    # write out the yml
+                    with open(fldr+myid+'.yml', 'w+') as f:
+                        yaml.dump(yMcf, f, sort_keys=False)
 
 def insert_or_update(content, db, dbtype):
     """ run a query """
@@ -188,7 +294,7 @@ def insert_or_update(content, db, dbtype):
                 str(content.get("type", "")), str(content.get("bounds", ""))))
         conn.commit()
     except Error as e:
-        print(e)
+        print('Failed inserting in db',e)
     finally:
         if conn:
             conn.close()

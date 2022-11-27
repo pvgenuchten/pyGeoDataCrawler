@@ -20,14 +20,15 @@ For metadata imports the tool wil use [owslib](https://github.com/geopython/owsl
 Usage (index files recursively from a file folder)
 
 ```
-crawl-metadata --dir=/mnt/data [--out-dir=/mnt/mapserver/mapfiles]
+crawl-metadata --mode=init --dir=/mnt/data [--out-dir=/mnt/mapserver/mapfiles]
 ```
 
 Mode explained:
 
-- `init`; creates new metadata for files which do not have it yet
-- `update`; updates the metadata, merging new content on existing (not overwriting)
-- `export`; exports the yaml metadata to xml and stored it in a folder (to be loaded on pycsw) or on a database (todo)
+- `init`; creates new metadata for files which do not have it yet (not overwriting)
+- `update`; updates the metadata, merging new content on existing (not creating new)
+- `export`; exports the mcf metadata to xml and stored it in a folder (to be loaded on pycsw) or on a database (todo)
+- `import-csv`; imports a csv of metadata fiels into a series of mcf files, typically combined with a [.j2 file](geodatacrawler/templates/csv.j2) with same name, which `maps` the csv-fields to mcf-fields 
 
 ## Minimal metadata
 
@@ -94,6 +95,17 @@ GDAL 3.3.2, released 2021/09/01
 In order to synchronise record-loading with record-hosting, we use the isric-pycsw image as a base.
 On top of it python poetry is loaded with the pygeodatacrawler code. this is used as a ci-cd container for example 
 in the lsc-hubs/dataset-inventarisation project
+
+## Sample calls
+
+```
+poetry run crawl-metadata --mode=update --dir=../../ejpsoil/ejpsoildatahub/datasets
+
+poetry run crawl-metadata --mode=import-csv --dir=../../ejpsoil/ejpsoildatahub/datasets --cluster=Country --sep=";" 
+
+poetry run crawl-metadata --mode=export --dir=../../ejpsoil/ejpsoildatahub/datasets --schema= --dir-out=../../ejpsoil/ejpsoildatahub/xml 
+
+```
 
 
 ## WSL-webdav specific

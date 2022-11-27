@@ -1,23 +1,18 @@
 mcf:
     version: 1.0
 metadata:
-  language: en
+  language: eng
 identification:
   language: eng
-  title: 
-    en: Empty title
-  abstract: 
-    en: Empty abstract
+  title: Empty
+  abstract: ""
   keywords:
     default:
       keywords:
-        en: 
-          - Empty keyword
+          - Empty
   fees: None
   accessconstraints: otherRestrictions
-  rights:
-      en:
-        https://creativecommons.org/licenses/by/4.0/
+  rights: https://creativecommons.org/licenses/by/4.0/
   topiccategory:
     - geoscientificInformation
 contact:
