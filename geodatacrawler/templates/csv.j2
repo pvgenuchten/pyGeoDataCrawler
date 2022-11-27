@@ -1,0 +1,84 @@
+mcf:
+    version: 1.0
+
+metadata:
+    identifier: 
+    language: {{md['resource language']}} 
+    language_alternate: {{md['second language']}} 
+    charset: utf8
+    hierarchylevel: dataset
+    datestamp: 
+    dataseturi: 
+
+spatial:
+    datatype: vector
+    geomtype: point
+    scale:  {{md['spatial resolution scale']}} 
+    resolution:  {{md['spatial resolution distance']}} 
+
+identification:
+    language: {{md['resource language']}}
+    charset: utf8
+    title: {{ md['resource title'] }}
+    abstract: md['resource abstract']
+    edition: 1.8.0
+    dates:
+        {{ md['temporal reference'] or 'publication' }}: {{ md['date of temporal reference'] or '2022' }}
+    keywords:
+        default:
+            keywords:
+                - 
+        country:
+            keywords: [{{ md['country'] }}]
+            vocabulary:
+                    name: Countries
+                    url: 
+        soilproperty:
+            keywords: [{{ md['data type'] | split(',') }}]
+            vocabulary:
+                name: Countries
+                url:
+        soiltheme:
+            keywords: [{{ md['theme'] }}]
+            vocabulary:
+                name: Countries
+                url:
+    topiccategory:
+        - geoscientificInformation
+    extents:
+        temporal:
+            - begin: 
+              end: 
+    fees: None
+    accessconstraints: {{ md['limitations on public access'] }}
+    rights: {{ md['conditions applying to access and use'] }}
+    url: {{ md['link_to_viewer'] }}
+    status: onGoing
+    maintenancefrequency: continual
+
+contact:
+    pointOfContact: &contact_poc
+        organization: {{md['organisation']}}
+        individualname: {{md['contactperson']}}
+        country: md['Country']
+        email: md['email address']
+        contactinstructions: email
+
+distribution:
+
+    {{md['format']}}:
+        url: {{md['url'] }}
+        type: {{md['format'] | upper }}
+        name: {{ md['layername'] }}
+        description:
+
+
+dataquality:
+    scope:
+        level: dataset
+    lineage:
+        statement: 
+
+
+
+

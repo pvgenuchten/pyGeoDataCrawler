@@ -2,7 +2,7 @@
 {% import 'common/iso19139-charstring.j2' as cs %}
 <gmd:MD_Metadata xmlns:gco="http://www.isotc211.org/2005/gco" xmlns:gmd="http://www.isotc211.org/2005/gmd" xmlns:gml="http://www.opengis.net/gml" xmlns:gmx="http://www.isotc211.org/2005/gmx" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.isotc211.org/2005/gmd http://www.isotc211.org/2005/gmd/gmd.xsd http://www.isotc211.org/2005/gmx http://www.isotc211.org/2005/gmx/gmx.xsd">
   <gmd:fileIdentifier>
-    <gco:CharacterString>{{ record['metadata']['identifier'] }}</gco:CharacterString>
+    <gco:CharacterString>{{ record['metadata']['identifier']|e }}</gco:CharacterString>
   </gmd:fileIdentifier>
   <gmd:language>
     <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeSpace="ISO 639-2" codeListValue="{{ record['metadata']['language'] }}">{{ record['metadata']['language'] }}</gmd:LanguageCode>
@@ -12,14 +12,14 @@
   </gmd:characterSet>
   {% if record['metadata']['parentidentifier'] %}
   <gmd:parentIdentifier>
-    <gco:CharacterString>{{ record['metadata']['parentidentifier'] }}</gco:CharacterString>
+    <gco:CharacterString>{{ record['metadata']['parentidentifier']|e }}</gco:CharacterString>
   </gmd:parentIdentifier>
   {% endif %}
   <gmd:hierarchyLevel>
     <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['metadata']['hierarchylevel'] }}">{{ record['metadata']['hierarchylevel'] }}</gmd:MD_ScopeCode>
   </gmd:hierarchyLevel>
   {% for key, value in record['contact'].items() %}
-  {% if key not in ['distributor', 'pointOfContact'] and value %}
+  {% if key in ['distributor', 'pointOfContact'] %}
   <gmd:contact>
     {% set contact = value %}
     {% set role = key %}
@@ -41,9 +41,11 @@
   <gmd:metadataStandardVersion>
     <gco:CharacterString>ISO 19115:2003</gco:CharacterString>
   </gmd:metadataStandardVersion>
+  {% if record['metadata']['dataseturi'] %}
   <gmd:dataSetURI>
-    <gco:CharacterString>{{ record['metadata']['dataseturi']|e }}</gco:CharacterString>
+    <gco:CharacterString>{{ record['metadata']['dataseturi'] | e }}</gco:CharacterString>
   </gmd:dataSetURI>
+  {% endif %}
   {% if record['metadata']['language_alternate'] %}
   <gmd:locale>
     <gmd:PT_Locale id="locale-fr">
@@ -77,7 +79,7 @@
       <gmd:referenceSystemIdentifier>
         <gmd:RS_Identifier>
           <gmd:code>
-            <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ record['identification']['extents']['spatial'][0]['crs'] }}</gco:CharacterString>
+            <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ record['identification']['extents']['spatial'][0]['crs']|e }}</gco:CharacterString>
           </gmd:code>
         </gmd:RS_Identifier>
       </gmd:referenceSystemIdentifier>
@@ -114,12 +116,12 @@
       <gmd:status>
         <gmd:MD_ProgressCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ProgressCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['status'] }}">{{ record['identification']['status'] }}</gmd:MD_ProgressCode>
       </gmd:status>
-      {% if 'pointOfContact' in record['contact'].items() and record['contact']['pointOfContact'] %}
-      {% set contact = record['contact']['pointOfContact'] %}
-      {% set role = 'pointOfContact' %}
+      {% if record['contact'] %}
+      {% for role, contact in record['contact'].items()  %}
       <gmd:pointOfContact>
       {% include "contact.j2" %}
       </gmd:pointOfContact>
+      {% endfor %}
       {% endif %}
       <gmd:resourceMaintenance>
         <gmd:MD_MaintenanceInformation>
@@ -156,25 +158,7 @@
           <gmd:type>
             <gmd:MD_KeywordTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_KeywordTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ value['keywords_type'] }}">{{ value['keywords_type'] }}</gmd:MD_KeywordTypeCode>
           </gmd:type>
-          {% if key == 'wmo' %}
-          <gmd:thesaurusName>
-            <gmd:CI_Citation>
-              <gmd:title>
-                <gmx:Anchor xlink:href="http://wis.wmo.int/2012/codelists/WMOCodeLists.xml#WMO_CategoryCode"/>
-              </gmd:title>
-              <gmd:date>
-                <gmd:CI_Date>
-                  <gmd:date>
-                    <gco:Date>2013-07-11</gco:Date>
-                  </gmd:date>
-                  <gmd:dateType>
-                    <gmd:CI_DateTypeCode codeList="http://wis.wmo.int/2011/schemata/iso19139_2007/schema/resources/Codelist/gmxCodelists.xml#CI_DateTypeCode" codeListValue="publication" codeSpace="ISOTC211/19115">publication</gmd:CI_DateTypeCode>
-                  </gmd:dateType>
-                </gmd:CI_Date>
-              </gmd:date>
-            </gmd:CI_Citation>
-          </gmd:thesaurusName>
-        {% elif value['vocabulary'] %}
+        {% if value['vocabulary'] %}
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               {% if value['vocabulary']['name'] and value['vocabulary']['url'] %}
@@ -200,8 +184,8 @@
         <gmd:MD_LegalConstraints>
           <gmd:accessConstraints>
             <gmd:MD_RestrictionCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_RestrictionCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['accessconstraints'] }}">{{ record['identification']['accessconstraints'] }}</gmd:MD_RestrictionCode>
-            {{ cs.get_freetext('supplementalInformation', record['metadata']['language_alternate'], get_charstring(record['identification'].get('rights'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
           </gmd:accessConstraints>
+          {{ cs.get_freetext('otherConstraints', record['metadata']['language_alternate'], get_charstring(record['identification'].get('rights'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
         </gmd:MD_LegalConstraints>
       </gmd:resourceConstraints>
       <gmd:spatialRepresentationType>
@@ -233,7 +217,7 @@
                 <gco:Boolean>1</gco:Boolean>
               </gmd:extentTypeCode>
               <gmd:polygon>
-                <gml:Polygon gml:id="P001" srsName="{{ spatial['crs'] }}" srsDimension="2">
+                <gml:Polygon gml:id="P001" srsName="{{ spatial['crs']|e }}" srsDimension="2">
                   <gml:exterior>
                     <gml:LinearRing>
                       <gml:posList srsName="{{ spatial['crs'] }}" srsDimension="2">{{ bbox[0] }} {{ bbox[1] }} {{ bbox[0] }} {{ bbox[3] }} {{ bbox[2] }} {{ bbox[3] }} {{ bbox[2] }} {{ bbox[1] }} {{ bbox[0] }} {{ bbox[1] }}</gml:posList>
@@ -338,13 +322,13 @@
       {% if v['format'] and v['format_version'] %}
       <gmd:distributionFormat>
         <gmd:MD_Format>
-          <gmd:name>{{ v['format'] }}</gmd:name>
-          <gmd:version>{{ v['format_version'] }}</gmd:version>
+          <gmd:name>{{ v['format']|e }}</gmd:name>
+          <gmd:version>{{ v['format_version']|e }}</gmd:version>
         </gmd:MD_Format>
       </gmd:distributionFormat>
       {% endif %}
       {% endfor %}
-      {% if 'distributor' in record['contact'] %}
+      {% if 'distributor' in record['contact'].keys() %}
       <gmd:distributor>
         <gmd:MD_Distributor>
           <gmd:distributorContact>
@@ -361,10 +345,10 @@
           <gmd:onLine>
             <gmd:CI_OnlineResource>
               <gmd:linkage>
-                <gmd:URL>{{ v['url'] }}</gmd:URL>
+                <gmd:URL>{{ v['url']|e }}</gmd:URL>
               </gmd:linkage>
               <gmd:protocol>
-                <gco:CharacterString>{{ v['type'] }}</gco:CharacterString>
+                <gco:CharacterString>{{ v['type']|e }}</gco:CharacterString>
               </gmd:protocol>
               {{ cs.get_freetext('name', record['metadata']['language_alternate'], get_charstring(v.get('name'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
               {{ cs.get_freetext('description', record['metadata']['language_alternate'], get_charstring(v.get('description'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
@@ -390,7 +374,7 @@
       <gmd:scope>
         <gmd:DQ_Scope>
           <gmd:level>
-            <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['dataquality']['scope']['level'] }}">{{ record['dataquality']['scope']['level'] }}</gmd:MD_ScopeCode>
+            <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['dataquality']['scope']['level'] or 'dataset' }}">{{ record['dataquality']['scope']['level'] }}</gmd:MD_ScopeCode>
           </gmd:level>
         </gmd:DQ_Scope>
       </gmd:scope>
@@ -407,9 +391,6 @@
       <gmd:maintenanceAndUpdateFrequency>
         <gmd:MD_MaintenanceFrequencyCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_MaintenanceFrequencyCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['maintenancefrequency'] }}">{{ record['identification']['maintenancefrequency'] }}</gmd:MD_MaintenanceFrequencyCode>
       </gmd:maintenanceAndUpdateFrequency>
-      <gmd:maintenanceNote>
-        <gco:CharacterString>This metadata record was generated by pygeometa-{{ pygeometa_version }} (https://github.com/geopython/pygeometa)</gco:CharacterString>
-      </gmd:maintenanceNote>
     </gmd:MD_MaintenanceInformation>
   </gmd:metadataMaintenance>
 </gmd:MD_Metadata>

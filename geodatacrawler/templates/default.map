@@ -44,21 +44,7 @@ MAP
         IMAGEMODE RGB
         EXTENSION "svg"
     END
-    
-    OUTPUTFORMAT
-        NAME "geojson"
-        DRIVER "TEMPLATE"
-        MIMETYPE "application/geo+json"
-        FORMATOPTION "FILE=bdod.js"
-    END
-    
-    OUTPUTFORMAT
-        NAME "html"
-        DRIVER "TEMPLATE"
-        MIMETYPE "text/html"
-        FORMATOPTION "FILE=bdod.html"
-    END
-    
+
     OUTPUTFORMAT
         NAME "AGGA"
         DRIVER AGG/PNG
@@ -75,11 +61,10 @@ MAP
             'ows_title'           ''
             'ows_srs'             'EPSG:152160 EPSG:4326 EPSG:3857 EPSG:54009 EPSG:54012'
             'ows_abstract'        ''
-            'ows_keywordlist'     'digital soil mapping,Soil science,Global,geoscientificInformation'     
-            'wms_feature_info_mime_type' 'text/html,application/geo+json'     
+            'ows_keywordlist'     ''     
+            'wms_feature_info_mime_type' 'text/html'     
             'ows_enable_request'   '*'
             'ows_getlegendgraphic_formatlist' 'image/png,image/svg+xml'
-            'ows_onlineresource'    'https://maps.isric.org/'
             'ows_description'        ''
             'ows_addresstype'          'postal'
             'ows_address'              'Droevendaalsesteeg 3, 6708 PB'
