@@ -1,3 +1,10 @@
+## [1.0.12](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.11...1.0.12) (2022-11-30)
+
+
+### Bug Fixes
+
+* thesaurus ([958ff61](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/958ff61baa49fa4260dbe277e7595587e2d7747a))
+
 ## [1.0.11](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.10...1.0.11) (2022-11-16)
 
 
