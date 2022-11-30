@@ -1,3 +1,10 @@
+## [1.0.11](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.10...1.0.11) (2022-11-16)
+
+
+### Bug Fixes
+
+* fix merge problem ([767a280](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/767a2807d1adf587c970a81aabb901a3da2f7e42))
+
 ## [1.0.10](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.9...1.0.10) (2022-11-16)
 
 
