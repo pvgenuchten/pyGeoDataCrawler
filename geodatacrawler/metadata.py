@@ -19,7 +19,7 @@ import re
 from . import templates
 
 webdavUrl = os.getenv('pgdc_webdav_url')
-
+canonicalUrl = os.getenv('pgdc_canonical_url')
 schemaPath = os.getenv('pgdc_schema_path')
 if not schemaPath:
     schemaPath = "/mnt/c/Users/genuc003/Projects/geopython/pyGeoDataCrawler/geodatacrawler/schemas"
@@ -128,6 +128,9 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     if 'webdav' not in target['distribution'].keys() or target['distribution']['webdav'] is None:
                                         # add a flag to indicate dav links should not be included? -> remove webdav
                                         target['distribution']['webdav']= {'url': webdavUrl + '/' +  fn, 'name': fn, 'type': 'WWW:LINK'}
+                                if canonicalUrl: # add a canonical url referencing the source (facilitates: edit me on git)
+                                    if 'canonical' not in target['distribution'].keys() or target['distribution']['canonical'] is None:
+                                        target['distribution']['canonical'] = {'url': canonicalUrl + '/' +  fn, 'name': fn, 'type': 'canonical', 'rel': 'canonical' }
                                 if target['contact'] is None or len(target['contact'].keys()) == 0:
                                     target['contact'] = {'example':{'organization':'Unknown'}}
                                 if 'robot' in target.keys():
