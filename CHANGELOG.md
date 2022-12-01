@@ -1,3 +1,10 @@
+## [1.0.13](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.12...1.0.13) (2022-12-01)
+
+
+### Bug Fixes
+
+* fixes keyword thesaurus, adds canonical ([7f03fc6](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/7f03fc69ec553eaf853ca8cc7efcd0d49fd20a0f))
+
 ## [1.0.12](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.11...1.0.12) (2022-11-30)
 
 
