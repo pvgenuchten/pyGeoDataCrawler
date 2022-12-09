@@ -13,9 +13,9 @@ from owslib.etree import etree
 
 from pprint import pprint
 
-INDEX_FILE_TYPES = ['html', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xml', 'json']
+INDEX_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
 GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'xls']
+VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 
 fiona.supported_drivers["OGR_VRT"] = "r"
@@ -32,13 +32,12 @@ def indexSpatialFile(fname, extension):
     # else extract metadata from file (or update metadata from file content)
     try:
         content = {
-            'identifier': os.path.splitext(fname)[0].replace('/','-'),
             'title': os.path.splitext(os.path.basename(fname))[0],
             'url': fname,
             'date': time.ctime(os.path.getmtime(fname))
         }
-    except FileNotFoundError:
-        print("File {0} does not exist".format(fname))
+    except Exception as e:
+        print("Error set file",fname,e)
         return
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
@@ -64,6 +63,10 @@ def indexSpatialFile(fname, extension):
             srcband.ComputeStatistics(0)
         mn=srcband.GetMinimum()
         mx=srcband.GetMaximum()
+        ct = srcband.GetColorTable()
+        clrTable = []
+        if ct:
+            clrTable = {str(i): list(ct.GetColorEntry(i)) for i in range(ct.GetCount())}
         
         content['bounds'] = [ulx, lry, lrx, uly]
         content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
@@ -73,17 +76,20 @@ def indexSpatialFile(fname, extension):
         content['crs'] = epsg
 
         content['content_info'] = {
-                "type": "image",
-                "dimensions": [{
+                'type': 'image',
+                'dimensions': [{
                     "resolution": xres,
                     "min": mn,
                     "max": mx,
                     "width": int(d.RasterXSize),
-                    "height": int(d.RasterYSize)
-                }]
+                    "height": int(d.RasterYSize),
+                    "colors": clrTable
+                }],
+                'meta':  d.GetMetadata()
             }
-        content['meta'] = d.GetMetadata()
 
+
+    
         d = None
 
     elif extension in VECTOR_FILE_TYPES:
@@ -154,7 +160,6 @@ def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
         epsg = crs.to_epsg()
     except Exception as e:
         print('Invalid src (wkt) provided: ', e)
-        return None
     if not epsg:
         if (wkt == 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'):
             return "epsg:42106"

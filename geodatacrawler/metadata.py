@@ -15,7 +15,11 @@ import pandas as pd
 import uuid
 from jinja2 import Environment
 import re
-
+import json
+import requests as req
+import lxml.etree
+from owslib.iso import *
+from owslib.fgdc import *
 from . import templates
 
 webdavUrl = os.getenv('pgdc_webdav_url')
@@ -25,10 +29,11 @@ if not schemaPath:
     schemaPath = "/mnt/c/Users/genuc003/Projects/geopython/pyGeoDataCrawler/geodatacrawler/schemas"
 
 # for supported formats, see apache tika - http://tika.apache.org/1.4/formats.html
-INDEX_FILE_TYPES = ['html', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xml', 'json']
+TEXT_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
 GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'xls']
+VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'kmz']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
+INDEX_FILE_TYPES = SPATIAL_FILE_TYPES + TEXT_FILE_TYPES
 
 def indexFile(fname):
     # createEncodedTempFile(fname)
@@ -88,26 +93,27 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cl
     if mode=='import-csv':
         importCsv(dir, dir_out, map, sep, cluster)
     else:
-        processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode)
+        processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir)
 
-def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode):
+def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode, root):
     if mode == 'export':
         coreMetadata = merge_folder_metadata(parentMetadata, target_path, mode)
     else:
         coreMetadata = parentMetadata
     for file in Path(target_path).iterdir():
         fname = str(file).split(os.sep).pop()
-        if file.is_dir() and not fname.startswith('.'):
+        if file.is_dir() and not fname.startswith('.') and not fname.startswith('~'):
             # go one level deeper
             print('process path: '+ str(file))
             
-            processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode)
+            processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root)
         else:
             # process the file
             fname = str(file)
             if '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split('/').pop()
+                relPath=base.replace('','')
                 if extension.lower() in ["yml","yaml"] and fn != "index":
                     if mode == "export":
                         ### export a file
@@ -125,12 +131,12 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 if 'distribution' not in target.keys() or target['distribution'] is None:
                                     target['distribution'] = {}
                                 if webdavUrl:
+                                    # todo: what is the actual extension of the spatial file? the self-link should actually be created by the initial crawler
                                     if 'webdav' not in target['distribution'].keys() or target['distribution']['webdav'] is None:
-                                        # add a flag to indicate dav links should not be included? -> remove webdav
                                         target['distribution']['webdav']= {'url': webdavUrl + '/' +  fn, 'name': fn, 'type': 'WWW:LINK'}
-                                if canonicalUrl: # add a canonical url referencing the source (facilitates: edit me on git)
+                                if canonicalUrl: # add a canonical url referencing the source record (facilitates: edit me on git)
                                     if 'canonical' not in target['distribution'].keys() or target['distribution']['canonical'] is None:
-                                        target['distribution']['canonical'] = {'url': canonicalUrl + '/' +  fn, 'name': fn, 'type': 'canonical', 'rel': 'canonical' }
+                                        target['distribution']['canonical'] = {'url': canonicalUrl + target_path + os.sep + fn + '.yml', 'name': 'Source of the record', 'type': 'canonical', 'rel': 'canonical' }
                                 if target['contact'] is None or len(target['contact'].keys()) == 0:
                                     target['contact'] = {'example':{'organization':'Unknown'}}
                                 if 'robot' in target.keys():
@@ -161,10 +167,16 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         # todo: if this fails, we give a warning, or initialise the file again??
                         if not orig:
                             orig = {}
-                        if orig['distribution'] is None: # edge case, apparently this case is not catched with orig.get('distribution',{})
+                        if 'distribution' not in orig or orig['distribution'] is None: # edge case, apparently this case is not catched with orig.get('distribution',{})
                             orig['distribution'] = {}
                         # evaluate if a file is attached, or is only a metadata (of a wms for example)
                         hasFile = None
+
+                        # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
+                        if 'dataseturi' in orig['metadata'] and orig['metadata']['dataseturi'] is not None:
+                            for u in orig['metadata']['dataseturi'].split(';'):
+                                md = fetchMetadata(u)
+                                dict_merge(orig, md)
 
                         for d,v in orig.get('distribution',{}).items():
                             if v.get('url','') not in [None,""] and (v.get('type','').upper().startswith('OGC:') 
@@ -185,9 +197,14 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 localFile = isDistributionLocal(v.get('url',''),target_path)
                                 if localFile:
                                     hasFile = localFile
-                                    cnt = indexSpatialFile(hasFile, extension)
+                                    cnt = indexSpatialFile(target_path+os.sep+hasFile, extension)
+                                    md2 = asPGM(cnt)
+                                    if (md2['identification']['title']):
+                                        md2['identification']['title'] = None
+                                    if md2['metadata']['identifier']:
+                                        md2['metadata']['identifier'] = None
                                     #merge with orig
-                                    dict_merge(orig,cnt) # or should we overwrite some values from cnt explicitely? (not title, etc)
+                                    dict_merge(orig,md2) # or should we overwrite some values from cnt explicitely? (not title, etc)
                         # save yf (or only if updated?)
                         try:
                             with open(str(file), 'w') as f:
@@ -195,27 +212,54 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         except Exception as e:
                             print('Failed to dump yaml:',e)
 
-                    # mode==init
-                    elif extension.lower() in SPATIAL_FILE_TYPES:
-                        print ('Indexing file ' + fname)
-                        yf = os.path.join(base+'.yml')
-                        if not os.path.exists(yf): # only if yml not exists yet
-                            # mode init for spatial files without metadata or update
-                            cnt = indexSpatialFile(fname, extension) 
-                            
-                            md = asPGM(cnt)
-                            # write yf
-                            try:
-                                with open(os.path.join(yf), 'w') as f:
-                                    yaml.dump(md, f, sort_keys=False)
-                            except Exception as e:
-                                print('Failed to dump yaml:',e)
-                    else:
-                        None
-                        # print('Skipping {}, not approved file type: {}'.format(fname, extension))
+                # mode==init
+                elif extension.lower() in INDEX_FILE_TYPES:
+                    print ('Indexing file ' + fname)
+                    relPath=os.sep.join(base.replace(root,'').split(os.sep)[:-1])
+                    if (dir_out_mode=='flat'):
+                        outBase = dir_out+os.sep+fn
+                    else:    
+                        outBase = dir_out+os.sep+relPath+os.sep+fn
+
+                    yf = os.path.join(outBase+'.yml')
+                    if not os.path.exists(yf): # only if yml not exists yet
+                        # mode init for spatial files without metadata or update
+                        cnt = indexSpatialFile(fname, extension) 
+                        md = asPGM(cnt)
+                    
+                        if 'metadata' not in md or md['metadata'] is None:
+                            md['metadata'] = {}
+                        if 'identifier' not in md['metadata'] or md['metadata']['identifier'] in [None,'']:
+                            md['metadata']['identifier'] = relPath.replace(os.sep,'')+fn
+                        if 'identification' not in md or md['identification'] is None:
+                            md['identification'] = {}
+                        if 'title' not in md['identification'] or md['identification']['title'] in [None,'']:
+                            md['identification']['title'] = fn
+                        if 'distribution' not in md or md['distribution'] is None:
+                            md['distribution'] = {}
+                        if len(md['distribution'].keys()) == 0:
+                            if webdavUrl:
+                                lnk = webdavUrl+os.sep+relPath+os.sep+fn+'.'+extension
+                            else:
+                                lnk = str(file)
+                            md['distribution']['local'] = { 'url':lnk, 'type': 'WWW:LINK', 'name':fn+'.'+extension }
+
+                        if not os.path.exists(dir_out+os.sep+relPath):
+                            os.makedirs(dir_out+os.sep+relPath)
+                            print('create folder',dir_out+os.sep+relPath)
+                        # write yf
+                        try:
+                            with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
+                                yaml.dump(md, f, sort_keys=False)
+                        except Exception as e:
+                            print('Failed to dump yaml:',e)
                 else:
                     None
-                    # print('Skipping {}, no extension'.format(fname))
+                    # print('Skipping {}, no indexable file type: {}'.format(fname, extension))
+            else:
+                None
+                # print('Skipping {}, no extension'.format(fname))
+
 
 def importCsv(dir,dir_out,map,sep,cluster):
     if sep in [None,'']:
@@ -234,7 +278,6 @@ def importCsv(dir,dir_out,map,sep,cluster):
                     map = f1.read()
             else: # default
                 map = pkg_resources.read_text(templates, 'csv.j2')
-            print(map)
             env = Environment(extensions=['jinja2_time.TimeExtension'])
             j2_template = env.from_string(map)
 
@@ -243,7 +286,6 @@ def importCsv(dir,dir_out,map,sep,cluster):
                 md = record.to_dict()
                 #Filter remover any None values
                 md = {k:v for k, v in md.items() if pd.notna(v)}
-                print("processing: ",md['resource title'])
                 # for each row, substiture values in a yml
                 try:    
                     mcf = j2_template.render(md=md)
@@ -321,12 +363,16 @@ def asPGM(dct):
     exp['identification']['dates'] = { 'creation': dct.get('date',datetime.date.today()) }
     if 'extents' not in exp['identification'].keys():
         exp['identification']['extents'] = {}
-    exp['identification']['extents']['spatial'] = [
-        {'bbox': dct.get('bounds',[]), 
-         'crs' : dct.get('crs','4326')}]
+    if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
+        bnds = dct.get('bounds_wgs84')
+        crs = 4326
+    else:
+        bnds = dct.get('bounds',[])
+        crs = dct.get('crs','4326')
+    exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
     exp['content_info'] = dct.get('content_info',{}) 
     #exp['distribution']['www']['url'] = webdavUrl+dct['url'] 
-    #exp['distribution']['www']['name']['en'] = dct['name'] 
+    #exp['distribution']['www']['name'] = dct['name'] 
     return exp
 
 def merge_folder_metadata(coreMetadata, path, mode):    
@@ -358,3 +404,35 @@ def createIndexIfDoesntExist(db):
         newFile = open(db, "wb")
         newFile.write(pkg_resources.read_binary(templates, 'index.sqlite'))
     return True
+
+def fetchMetadata(u):
+    # analyse url
+    if not u.strip().startswith('http') or u.strip().startswith('//'):
+        return None
+
+    if 'doi.org' in u:
+        resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'})
+        if resp.status_code == 200:
+            aDOI = json.loads(resp.text)
+            print(aDOI)
+            md = {}
+            return md
+        else:
+            print('doi 404',u)
+    else:    
+        try:
+            resp = req.get(u)
+            iso_os = ISO19139OutputSchema()
+            md = iso_os.import_(resp.text)
+            return md
+        except Exception as e:
+            print('no iso19139 at',u)
+
+    
+    # fetch the url
+
+    # identify the type (xml, json)
+
+    # if xml, identify type (md_metadata, fgdc, )
+ 
+                                    
