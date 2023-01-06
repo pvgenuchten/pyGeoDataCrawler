@@ -4,12 +4,16 @@ import time
 import sys
 import pprint
 import urllib.request
+from copy import deepcopy
 import fiona
 from pyproj import CRS
 from osgeo import gdal, osr
 from urllib.parse import urlparse, parse_qsl
 from owslib.iso import *
 from owslib.etree import etree
+import json
+import requests as req
+from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 
 from pprint import pprint
 
@@ -210,6 +214,8 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         return {}
     matchedLayers = {}
 
+    # 3 situations can occur; name=single, name=mulitple, name=all
+
     if '//' not in url: # this fails if url has '//' elsewhere
         url = '//'+url
     # mapsever uses ?map=xxx to create unique endpoints, we need to include 'map' in unique key for a service
@@ -230,50 +236,63 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         capabs = OWSCapabilitiesCache['WMS'][owsbase]
         if capabs:
 
+            idf = dict(capabs);
+
+            capmd = {
+                'mcf':{'version':'1.0'},
+                'identification' : idf['identification'],
+                'distribution':{}
+            }
+            #only copy contact if it is not empty
+            if (idf.get('contact',{}).get('distributor',{}).get('organization','') != '' 
+                or idf.get('contact',{}).get('distributor',{}).get('individualName','') != ''):
+                capmd['contact'] = idf['contact']
+
+            if 'keywords' in capmd['identification'] and hasattr(capmd['identification']['keywords'], "__len__"):
+                capmd['identification']['keywords'] = {'default': {'keywords': capmd['identification']['keywords']}}
+            
             # if service only has 1 layer
-            if len(capabs.get('distribution',{}).items()) == 1:
-                print('match single layer')
-                return capabs['distribution']
+            if len(idf.get('distribution',{}).items()) == 1: #todo: what if 1 (root)layer without name + 1 layer with name
+                return prepCapabsResponse(capmd, idf['distribution'])
 
             # check if layers in url, a linkage convention used in Flanders and Canada 
             qs2 = dict(parse_qsl(parsed.query))
             if 'layers' in qs2:
-                name = qs2['layers']
-            
+                name = qs2['layers'].split(',')
             # check if dist.name in layer capabilities (todo: do this only once, not every run?) 
-            if name not in [None,'']:
+            if name is not None:
                 # in some cases name is a string
                 if isinstance(name, str):
                     name = name.split(',')
-                for l in name: # name may contain multiple layers
-                    if l in capabs.get('distribution',{}):
-                        matchedLayers[l] = capabs['distribution'][l]
+                for l in name: # name may contain multiple layers (or all)
+                    if name == 'ALL':
+                        matchedLayers = idf.get('distribution',{})
+                    else:
+                        for k,wl in idf.get('distribution',{}).items():
+                            for l in name:
+                                if wl.get('name','').upper() == l.upper():
+                                    matchedLayers[k] = wl
             if len(matchedLayers.keys())>0: 
                 print('match on dist.name', name)
-                return matchedLayers
+                return prepCapabsResponse(capmd, matchedLayers)
 
             # check if metadataurl matches identifier (todo: or import all metadata)
             if identifier not in [None,'']:
-                for k,v in capabs.get('distribution',{}).items():
-                    if 'metadataUrls' in v and len(v['metadataUrls']) > 0:
-                        for u in v['metadataUrls']:
-                            if identifier in u.get('url','') and u.get('format','') == 'text/xml':
-                                try: 
-                                    # fetch url with owslib, see if can parse, or write xml to disk?
-                                    # m=MD_Metadata(etree.parse(u))
-                                    print('metadata link', u.get('url',''))
-                                except Exception as e:
-                                    print('Failed parsing',u,e)
+                for k,v in idf.get('distribution',{}).items():
+                    for x,y in v['metadataUrls']:
+                        if identifier in y['url']:
+                            matchedLayers[k] = v
+                return prepCapabsResponse(capmd, matchedLayers)
 
             # match by title? 
             if title not in [None,'']:
-                for k,v in capabs.get('distribution',{}).items():
+                for k,v in idf.get('distribution',{}).items():
                     if (v.get('name').lower().strip() == title.lower().strip() 
                         or v.get('title').lower().strip() == title.lower().strip()):
-                        matchedLayers[k] = capabs['distribution'][k]
+                        matchedLayers[k] = idf['distribution'][k]
             if len(matchedLayers.keys())>0: 
                 print('match on title', title)
-                return matchedLayers
+                return prepCapabsResponse(capmd, matchedLayers)
             
             # not found matched layer?
                 # suggestion for a layer?? 
@@ -284,7 +303,64 @@ def checkOWSLayer(url, protocol, name, identifier, title):
     else:
         print(protocol,'not implemented',url,identifier)
     
-    return matchedLayers
+    return prepCapabsResponse(capmd, matchedLayers)
+
+
+def prepCapabsResponse(CoreMD,lyrs):
+    ''' prepares owslib-layers before being returned, returns only unique layers '''
+    lyrs2 = {}
+    for k,v in lyrs.items():
+        if 'metadataUrls' in v and len(v['metadataUrls']) > 0:
+            if len(v['metadataUrls']) == 1: # todo: check if metadataurl already used
+                md = fetchMetadata(u)
+            elif len(v['metadataUrls']) > 1:    
+                for u in v['metadataUrls']:
+                    if (u['url'] not in [None,''] and (
+                    'http://www.isotc211.org/2005/gmd' in u['url'] or # csw request / geonode    
+                    u.get('format','') == 'text/xml' )): 
+                        mu = u
+                if not mu: #take first
+                    mu = v['metadataUrls'][0]
+                md = fetchMetadata(mu['url'])
+                if md:
+                    v['metaidentifier'] = md.identifier
+                    if md.identioninfo.get('uricode','') != '': # l.identifier should be the same as uricode
+                        v['identifier'] = md.identioninfo.get('uricode','')
+                    v['metadata'] = md
+        if v.get('metaidentifier','') != '':
+            lyrs2[v.metaidentifier] = v # multiple layers with same metadata uuid will be overwritten -> md will be used, assuming it has a reverse link to all layers
+        elif v.get('identifier','') != '':
+            lyrs2[v.identifier] = v
+        else:
+            lyrs2[k] = v #leave untouched
+            
+    CoreMD['distribution'] = lyrs2
+
+    return CoreMD 
+
+def fetchMetadata(u):
+    ''' fetch metadata of a url, first determine type then parse it '''
+    # analyse url
+    if not (u.strip().startswith('http') or u.strip().startswith('//')):
+        return None
+
+    if 'doi.org' in u:
+        resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'})
+        if resp.status_code == 200:
+            aDOI = json.loads(resp.text)
+            md = {aDOI} # todo: parse DOI
+            return md
+        else:
+            print('doi 404', u) # todo: retrieve instead the citation
+    else:    
+        try:
+            resp = req.get(u)
+            iso_os = ISO19139OutputSchema()
+            md = iso_os.import_(resp.text)
+            return md
+        except Exception as e:
+            print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+
 
 def owsCapabilities2md (url, protocol):
     lyrmd  = None; 
@@ -300,13 +376,13 @@ def owsCapabilities2md (url, protocol):
             except Exception as e:
                 print("Fetch WMS 1.1.1 " + url + " failed. " + str(e))
         if (wms):
-            print ('version:',wms.identification.version)
+            print ('Parse url',url,'WMS version:',wms.identification.version)
             idf = wms.identification
-            lyrmd = { 'title': idf.title,
+            lyrmd = { "identification":{   'title': idf.title,
                         'abstract': idf.abstract,
                         'keywords': idf.keywords,
                         'accessconstraints': idf.accessconstraints,
-                        'fees': idf.fees }
+                        'fees': idf.fees }}
             lyrmd['contact'] = {
                 'distributor': {
                     'organization': wms.provider.name,
@@ -339,3 +415,12 @@ def owsCapabilities2md (url, protocol):
         print(protocol,'not implemented')
     
     return lyrmd
+
+def safeFileName(n):
+    ''' remove unsafe characters from a var to make it safe'''
+
+    for i in ['(',')','[',']','{','}','&','~','%','+']:
+        n = n.replace(i,'')
+    for i in ['#',' ','!','+']:
+        n = n.replace(i,'-')
+    return n
