@@ -9,7 +9,7 @@ from sqlite3 import Error
 import datetime
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from pygeometa.core import read_mcf, render_j2_template
-from geodatacrawler.utils import indexSpatialFile, dict_merge, isDistributionLocal, checkOWSLayer
+from geodatacrawler.utils import indexSpatialFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName
 from pathlib import Path
 import pandas as pd
 import uuid
@@ -113,36 +113,42 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
             if '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split('/').pop()
-                relPath=base.replace('','')
+                #relPath=base.replace(root,'')
                 if extension.lower() in ["yml","yaml"] and fn != "index":
                     if mode == "export":
                         ### export a file
                         try:
+                            #if 1==1:
                             with open(fname, mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 if not cnf:
                                     cnf = { 'metadata':{ 'identifier': fn } }
-                                elif 'metadata' not in cnf.keys() or cnf['metadata'] is None: 
+                                elif 'metadata' not in cnf or cnf['metadata'] is None: 
                                     cnf['metadata'] = { 'identifier': fn }
-                                elif 'identifier' not in cnf['metadata'].keys() or cnf['metadata']['identifier'] in [None,""]:
+                                elif 'identifier' not in cnf['metadata'] or cnf['metadata']['identifier'] in [None,""]:
                                     cnf['metadata']['identifier'] = fn
                                 target = deepcopy(coreMetadata)
                                 dict_merge(target,cnf)
-                                if 'distribution' not in target.keys() or target['distribution'] is None:
+                                # in many cases keywords are kept as array, not in the default thesaurus
+                                if 'identification' not in target:
+                                    target['identification'] = {}
+                                
+                                if 'distribution' not in target or target['distribution'] is None:
                                     target['distribution'] = {}
                                 if webdavUrl:
                                     # todo: what is the actual extension of the spatial file? the self-link should actually be created by the initial crawler
-                                    if 'webdav' not in target['distribution'].keys() or target['distribution']['webdav'] is None:
+                                    if 'webdav' not in target['distribution'] or target['distribution']['webdav'] is None:
                                         target['distribution']['webdav']= {'url': webdavUrl + '/' +  fn, 'name': fn, 'type': 'WWW:LINK'}
                                 if canonicalUrl: # add a canonical url referencing the source record (facilitates: edit me on git)
-                                    if 'canonical' not in target['distribution'].keys() or target['distribution']['canonical'] is None:
+                                    if 'canonical' not in target['distribution'] or target['distribution']['canonical'] is None:
                                         target['distribution']['canonical'] = {'url': canonicalUrl + target_path + os.sep + fn + '.yml', 'name': 'Source of the record', 'type': 'canonical', 'rel': 'canonical' }
                                 if target['contact'] is None or len(target['contact'].keys()) == 0:
                                     target['contact'] = {'example':{'organization':'Unknown'}}
-                                if 'robot' in target.keys():
+                                if 'robot' in target:
                                     target.pop('robot')
                                 md = read_mcf(target)
                                 #yaml to iso/dcat
+                                print('md2xml',md)
                                 if schemaPath and os.path.exists(schemaPath):
                                     xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
                                 else:
@@ -152,9 +158,9 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     insert_or_update(target, dir_out)
                                 elif dbtype == "path":
                                     if dir_out_mode == "flat":
-                                        pth = os.path.join(dir_out,md['metadata']['identifier']+'.xml')
+                                        pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.xml')
                                     else:
-                                        pth = os.path.join(target_path,os.sep,md['metadata']['identifier']+'.xml')
+                                        pth = os.path.join(target_path,os.sep,safeFileName(md['metadata']['identifier'])+'.xml')
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
                                         print('iso19139 xml generated at '+pth)    
@@ -172,45 +178,108 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         # evaluate if a file is attached, or is only a metadata (of a wms for example)
                         hasFile = None
 
+
+                        skipOWS = False # not needed if this is fetched from remote
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
                         if 'dataseturi' in orig['metadata'] and orig['metadata']['dataseturi'] is not None:
                             for u in orig['metadata']['dataseturi'].split(';'):
+                                print(u)
                                 md = fetchMetadata(u)
                                 dict_merge(orig, md)
+                                skipOWS = True
 
-                        for d,v in orig.get('distribution',{}).items():
-                            if v.get('url','') not in [None,""] and (v.get('type','').upper().startswith('OGC:') 
-                                or v.get('type','').upper() in ['WMS','WFS','WCS','WMTS']):
-                                print('check distribution:',v.get('url',''),v.get('type',''),v.get('name',''))
-                                hasFiles = checkOWSLayer(v.get('url',''),v.get('type',''),v.get('name',''), orig.get('metadata',{}).get('identifier'), orig.get('identification',{}).get('title'))
-                                if hasFiles and len(hasFiles.keys()) > 0:
-                                    hasfile = hasFiles[list(hasFiles.keys())[0]] # todo, process multiple
-                                    for k,v in hasfile.items():
-                                        if k == 'extent':
-                                            if 'extents' not in orig['identification']: orig['identification']['extents'] = {}
-                                            if 'spatial' not in orig['identification']['extents']: orig['identification']['extents']['spatial'] = []
-                                            orig['identification']['extents']['spatial'] = [v]
-                                        elif k == 'name':
-                                            orig['distribution'][d]['name'] = v
-                            # todo: process metadata links (doi/...)
-                            else:
-                                localFile = isDistributionLocal(v.get('url',''),target_path)
-                                if localFile:
-                                    hasFile = localFile
-                                    cnt = indexSpatialFile(target_path+os.sep+hasFile, extension)
-                                    md2 = asPGM(cnt)
-                                    if (md2['identification']['title']):
-                                        md2['identification']['title'] = None
-                                    if md2['metadata']['identifier']:
-                                        md2['metadata']['identifier'] = None
-                                    #merge with orig
-                                    dict_merge(orig,md2) # or should we overwrite some values from cnt explicitely? (not title, etc)
+                        # extract metadata from OWS
+                        hasProcessed = []
+                        skipFinalWrite = False
+                        if not skipOWS:
+                            for d,v in orig.get('distribution',{}).items():
+                                if (v.get('url','') not in [None,""] 
+                                    and (v.get('type','').upper().startswith('OGC:') 
+                                    or v.get('type','').upper() in ['WMS','WFS','WCS','WMTS'])
+                                    and v['url'].split('?')[0] not in  hasProcessed):
+                                    hasProcessed.append(v['url'].split('?')[0])
+                                    print('check distribution:',v.get('url',''),v.get('type',''),v.get('name',''))
+                                    owsCapabs = checkOWSLayer(v.get('url',''),
+                                                            v.get('type',''),
+                                                            v.get('name',''), 
+                                                            orig.get('metadata',{}).get('identifier'), 
+                                                            orig.get('identification',{}).get('title'))
+                                    hasFiles = owsCapabs['distribution']
+
+                                    if hasFiles and len(hasFiles.keys()) > 0:
+                                        for k,l in hasFiles.items():
+                                            # are they vizualistations of the same dataset, or unique?
+                                            # duplicate record
+                                            nw = deepcopy(orig)
+                                            # merge incoming 
+
+                                            if 'meta' in l:
+                                                md = l['meta']
+                                            else:
+                                                md = {
+                                                    'metadata': {'identifier': l.get('metaidentifier',l.get('identifier',nw['metadata']['identifier']+'-'+l.get('name','')))},
+                                                    'identification': {
+                                                        'title': l.get('name',''),
+                                                        'abstract': l.get('abstract',''),
+                                                        'keywords': l.get('keywords',[]),
+                                                        'extents': {'spatial': [l['extent']]},
+                                                        'rights': owsCapabs.get('accessconstraints',''),
+                                                        'fees': owsCapabs.get('fees','')
+                                                    },
+                                                    'distribution': { 
+                                                        'wms': {
+                                                            'name': l['name'],
+                                                            'description': l['abstract'],
+                                                            'url': v['url'],
+                                                            'type': 'OGC:WMS' 
+                                                    }}
+                                                }
+
+                                            # if only one, replace original
+                                            if len(hasFiles.keys()) == 1:
+                                                print('AA',md)
+                                                dict_merge(md, nw)
+                                                nw=md
+                                                targetFile = str(file)
+                                                # restore original metadata identifier
+                                                nw['metadata']['identifier'] = orig['metadata'].get('identifier',nw['metadata']['identifier'])
+                                            # else multiple
+                                            else:
+                                                dict_merge(nw, md)
+                                                targetFile = target_path+os.sep + safeFileName(md['metadata']['identifier']) + '.yml'
+                                                # todo:should we remove the original file? str(file)
+                                            # todo: check unique id
+                                            # write file
+
+                                            try:
+                                                skipFinalWrite = True
+                                                with open(targetFile, 'w') as f:
+                                                    yaml.dump(nw, f, sort_keys=False)
+                                            except Exception as e:
+                                                print('Failed to dump yaml:',e)
+                                        
+
+                                # todo: process metadata links (doi/...)
+                                else:
+                                    localFile = isDistributionLocal(v.get('url',''),target_path)
+                                    if localFile:
+                                        hasFile = localFile
+                                        cnt = indexSpatialFile(target_path+os.sep+hasFile, extension)
+                                        md2 = asPGM(cnt)
+                                        if (md2['identification']['title']):
+                                            md2['identification']['title'] = None
+                                        if md2['metadata']['identifier']:
+                                            md2['metadata']['identifier'] = None
+                                        #merge with orig
+                                        dict_merge(orig,md2) # or should we overwrite some values from cnt explicitely? (not title, etc)
+                            
                         # save yf (or only if updated?)
-                        try:
-                            with open(str(file), 'w') as f:
-                                yaml.dump(orig, f, sort_keys=False)
-                        except Exception as e:
-                            print('Failed to dump yaml:',e)
+                        if not skipFinalWrite:
+                            try:
+                                with open(str(file), 'w') as f:
+                                    yaml.dump(orig, f, sort_keys=False)
+                            except Exception as e:
+                                print('Failed to dump yaml:',e)
 
                 # mode==init
                 elif extension.lower() in INDEX_FILE_TYPES:
@@ -269,17 +338,21 @@ def importCsv(dir,dir_out,map,sep,cluster):
         if not file.is_dir() and fname.endswith('.csv'):
             f,e = str(fname).rsplit('.', 1)
             # which mapping file to use?
-            print(dir+f+'.j2')
             if map not in [None,""] and os.path.exists(map): # incoming param
+                print('template',map)
                 with open(map) as f1:
                     map = f1.read()
-            elif os.path.exists(dir+f+'.j2'): # same name, *.tpl
-                with open(dir+f+'.j2') as f1:
+            elif os.path.exists(dir+os.sep+f+'.j2'): # same name, *.tpl
+                print('use template',dir+os.sep+f+'.j2')
+                with open(dir+os.sep+f+'.j2') as f1:
                     map = f1.read()
             else: # default
+                print('use tmpl default')
                 map = pkg_resources.read_text(templates, 'csv.j2')
             env = Environment(extensions=['jinja2_time.TimeExtension'])
             j2_template = env.from_string(map)
+
+
 
             myDatasets = pd.read_csv(file, sep=sep)
             for i, record in myDatasets.iterrows():
@@ -289,6 +362,7 @@ def importCsv(dir,dir_out,map,sep,cluster):
                 # for each row, substiture values in a yml
                 try:    
                     mcf = j2_template.render(md=md)
+                    print(mcf)
                     try:
                         yMcf = yaml.load(mcf, Loader=SafeLoader)
                     except Error as e:
@@ -312,9 +386,11 @@ def importCsv(dir,dir_out,map,sep,cluster):
                             myid = str(uuid.uuid1());
                         if cluster not in [None,""] and cluster in md.keys():
                             myid = md[cluster] + '-' + myid
+                        if not 'metadata' in yMcf:
+                            yMcf['metadata'] = {}
                         yMcf['metadata']['identifier'] = myid
                     # write out the yml
-                    with open(fldr+myid+'.yml', 'w+') as f:
+                    with open(fldr+safeFileName(myid)+'.yml', 'w+') as f:
                         yaml.dump(yMcf, f, sort_keys=False)
 
 def insert_or_update(content, db, dbtype):
@@ -405,30 +481,7 @@ def createIndexIfDoesntExist(db):
         newFile.write(pkg_resources.read_binary(templates, 'index.sqlite'))
     return True
 
-def fetchMetadata(u):
-    # analyse url
-    if not u.strip().startswith('http') or u.strip().startswith('//'):
-        return None
 
-    if 'doi.org' in u:
-        resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'})
-        if resp.status_code == 200:
-            aDOI = json.loads(resp.text)
-            print(aDOI)
-            md = {}
-            return md
-        else:
-            print('doi 404',u)
-    else:    
-        try:
-            resp = req.get(u)
-            iso_os = ISO19139OutputSchema()
-            md = iso_os.import_(resp.text)
-            return md
-        except Exception as e:
-            print('no iso19139 at',u)
-
-    
     # fetch the url
 
     # identify the type (xml, json)
