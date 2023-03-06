@@ -7,7 +7,7 @@ stages:
 
 # tag release
 tag:
-  image: harbor.containers.wurnet.nl/proxy-cache/library/node:14.18-buster-slim
+  image: harbor.containers.wurnet.nl/proxy-cache/library/node:16.19-buster-slim
   stage: tag
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends git-core ca-certificates
