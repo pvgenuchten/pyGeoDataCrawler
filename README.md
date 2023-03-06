@@ -76,7 +76,7 @@ poetry run crawl-mapfile --dir=/mnt/data
 or run a shell in the poetry env
 
 ```
-poetry shell
+poetry shell 
 ```
 
 The GDAL dependency has some installation issue on poetry, see [here](https://stackoverflow.com/a/70986804) for a workaround
