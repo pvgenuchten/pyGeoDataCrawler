@@ -1,3 +1,11 @@
+## [1.0.14](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.13...1.0.14) (2023-03-06)
+
+
+### Bug Fixes
+
+* update node version ([fd92788](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/fd92788259558d569fa170a1f05e6e8dcb34fedf))
+* update to 19.7 ([2a34f12](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/2a34f12f3f5cc3a500d9274562391cab9b3ca2b6))
+
 ## [1.0.13](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.12...1.0.13) (2022-12-01)
 
 
