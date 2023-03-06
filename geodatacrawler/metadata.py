@@ -21,6 +21,7 @@ import lxml.etree
 from owslib.iso import *
 from owslib.fgdc import *
 from . import templates
+from hashlib import md5
 
 webdavUrl = os.getenv('pgdc_webdav_url')
 canonicalUrl = os.getenv('pgdc_canonical_url')
@@ -58,7 +59,9 @@ def indexFile(fname):
 @click.option('--cluster', nargs=1, required=False, help="Use a field to cluster records in a folder, default:none")
 def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cluster):
     if not dir:
-        dir = "."
+        dir = "./"
+    if dir[-1] != "/":
+        dir += "/"
     if not dir_out:
         dir_out = dir
     if not dir_out_mode or dir_out_mode not in ["flat","nested"]:
@@ -114,7 +117,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split('/').pop()
                 #relPath=base.replace(root,'')
-                if extension.lower() in ["yml","yaml"] and fn != "index":
+                if extension.lower() in ["yml","yaml","mcf"] and fn != "index":
                     if mode == "export":
                         ### export a file
                         try:
@@ -204,60 +207,89 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                             v.get('name',''), 
                                                             orig.get('metadata',{}).get('identifier'), 
                                                             orig.get('identification',{}).get('title'))
-                                    hasFiles = owsCapabs['distribution']
+                                    if owsCapabs and 'distribution' in owsCapabs:
+                                        hasFiles = owsCapabs['distribution']
+                                        myDatasets = {}
+                                        if len(hasFiles.keys()) > 0:
+                                            
+                                            # remove the original file? str(file)
+                                            try:
+                                                os.remove(str(fname))
+                                            except Exception as e:
+                                                print ('can not remove original file',fname,e)
 
-                                    if hasFiles and len(hasFiles.keys()) > 0:
-                                        for k,l in hasFiles.items():
-                                            # are they vizualistations of the same dataset, or unique?
-                                            # duplicate record
-                                            nw = deepcopy(orig)
-                                            # merge incoming 
+                                            for k,l in hasFiles.items():
+                                                # are they vizualistations of the same dataset, or unique?
+                                                # see if their identification is unique, else consider them distributions of the same dataset
+                                                
+                                                # find identification of layer, else use 'unknown'
+                                                LayerID = l.get('metaidentifier','')
+                                                #if LayerID in ('None',''):
+                                                #    LayerID = l.get('identifier','')
+                                                if LayerID in ('None',''):
+                                                    LayerID='unknown'
 
-                                            if 'meta' in l:
-                                                md = l['meta']
-                                            else:
-                                                md = {
-                                                    'metadata': {'identifier': l.get('metaidentifier',l.get('identifier',nw['metadata']['identifier']+'-'+l.get('name','')))},
-                                                    'identification': {
-                                                        'title': l.get('name',''),
-                                                        'abstract': l.get('abstract',''),
-                                                        'keywords': l.get('keywords',[]),
-                                                        'extents': {'spatial': [l['extent']]},
-                                                        'rights': owsCapabs.get('accessconstraints',''),
-                                                        'fees': owsCapabs.get('fees','')
-                                                    },
-                                                    'distribution': { 
-                                                        'wms': {
-                                                            'name': l['name'],
-                                                            'description': l['abstract'],
-                                                            'url': v['url'],
-                                                            'type': 'OGC:WMS' 
-                                                    }}
-                                                }
+                                                # see if layer with that id is already avaible, else create it
+                                                if LayerID in myDatasets:
+                                                    if 'distribution' not in myDatasets[LayerID]:
+                                                        myDatasets[LayerID]['distribution'] = {}
+                                                    myDatasets[LayerID]['distribution'][l['name']] = {
+                                                                'name': l['name'],
+                                                                'description': l['abstract'],
+                                                                'url': v['url'],
+                                                                'type': 'OGC:WMS' 
+                                                        }
+                                                else:
+                                                    # duplicate record
+                                                    nw = deepcopy(orig)
+                                                    # merge incoming 
+                                                    if 'meta' in l:
+                                                        myDatasets['LayerID'] = l['meta']
+                                                    else:
+                                                        myDatasets['LayerID'] = {
+                                                            'metadata': {'identifier': l.get('metaidentifier',l.get('identifier',nw['metadata']['identifier']))},
+                                                            'identification': {
+                                                                'title': l.get('name',''),
+                                                                'abstract': l.get('abstract',''),
+                                                                'keywords': l.get('keywords',[]),
+                                                                'extents': {'spatial': [l['extent']]},
+                                                                'rights': owsCapabs.get('accessconstraints',''),
+                                                                'fees': owsCapabs.get('fees','')
+                                                            },
+                                                            'distribution': { 
+                                                                'wms': {
+                                                                    'name': l['name'],
+                                                                    'description': l['abstract'],
+                                                                    'url': v['url'],
+                                                                    'type': 'OGC:WMS' 
+                                                            }}
+                                                        }
 
                                             # if only one, replace original
-                                            if len(hasFiles.keys()) == 1:
-                                                print('AA',md)
+                                            if len(myDatasets.keys()) == 1:
+                                                md = list(myDatasets.values())[0]
                                                 dict_merge(md, nw)
                                                 nw=md
                                                 targetFile = str(file)
                                                 # restore original metadata identifier
                                                 nw['metadata']['identifier'] = orig['metadata'].get('identifier',nw['metadata']['identifier'])
+                                                try:
+                                                    skipFinalWrite = True
+                                                    with open(targetFile, 'w') as f:
+                                                        yaml.dump(nw, f, sort_keys=False)
+                                                except Exception as e:
+                                                    print('Failed to dump single yaml:',targetFile,e)
                                             # else multiple
                                             else:
-                                                dict_merge(nw, md)
-                                                targetFile = target_path+os.sep + safeFileName(md['metadata']['identifier']) + '.yml'
-                                                # todo:should we remove the original file? str(file)
-                                            # todo: check unique id
-                                            # write file
-
-                                            try:
-                                                skipFinalWrite = True
-                                                with open(targetFile, 'w') as f:
-                                                    yaml.dump(nw, f, sort_keys=False)
-                                            except Exception as e:
-                                                print('Failed to dump yaml:',e)
-                                        
+                                                for k,md in myDatasets.items():
+                                                    dict_merge(nw, md)
+                                                    targetFile = target_path+os.sep + safeFileName(md['metadata']['identifier']) + '.yml'
+                                                    try:
+                                                        skipFinalWrite = True
+                                                        with open(targetFile, 'w') as f:
+                                                            yaml.dump(nw, f, sort_keys=False)
+                                                    except Exception as e:
+                                                        print('Failed to dump yaml:',targetFile,e)
 
                                 # todo: process metadata links (doi/...)
                                 else:
@@ -352,17 +384,15 @@ def importCsv(dir,dir_out,map,sep,cluster):
             env = Environment(extensions=['jinja2_time.TimeExtension'])
             j2_template = env.from_string(map)
 
-
-
             myDatasets = pd.read_csv(file, sep=sep)
             for i, record in myDatasets.iterrows():
                 md = record.to_dict()
-                #Filter remover any None values
+                #Filter remove any None values
                 md = {k:v for k, v in md.items() if pd.notna(v)}
                 # for each row, substiture values in a yml
                 try:    
                     mcf = j2_template.render(md=md)
-                    print(mcf)
+                    #print(mcf)
                     try:
                         yMcf = yaml.load(mcf, Loader=SafeLoader)
                     except Error as e:
@@ -381,15 +411,17 @@ def importCsv(dir,dir_out,map,sep,cluster):
                     # which id to use
                     myid = yMcf.get('metadata',{}).get('identifier')
                     if myid in [None,'']:
-                        myid = re.sub('[^A-Za-z0-9]+', '', yMcf.get('identification',{}).get('title',str(uuid.uuid1())))
+                        myid = md5(yMcf.get('identification',{}).get('title',str(uuid.uuid1())).encode()).hexdigest()
                         if myid == '':
                             myid = str(uuid.uuid1());
-                        if cluster not in [None,""] and cluster in md.keys():
-                            myid = md[cluster] + '-' + myid
+                        # prepend cluster in id
+                        # if cluster not in [None,""] and cluster in md.keys():
+                        #    myid = md[cluster] + '-' + myid
                         if not 'metadata' in yMcf:
                             yMcf['metadata'] = {}
                         yMcf['metadata']['identifier'] = myid
                     # write out the yml
+                    print("Save to file",fldr+safeFileName(myid)+'.yml')
                     with open(fldr+safeFileName(myid)+'.yml', 'w+') as f:
                         yaml.dump(yMcf, f, sort_keys=False)
 
