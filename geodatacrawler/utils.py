@@ -336,16 +336,17 @@ def prepCapabsResponse(CoreMD,lyrs):
 
     return CoreMD 
 
-def DOIRelations(url, relations):
+def DOIRelations(doi, relations):
     rels = {}
-    if url:
-        rels['contentUrl'] = {'url': url}
-    for r in relations:
+    if (doi):
+        rels['contentUrl'] = {'url': doi, 'type': 'WWW:LINK', 'title': 'Link'}
+    for i, r in enumerate(relations):
         if r.get('relatedIdentifierType','')=='DOI' and r.get('relatedIdentifier','') != '':
             u2 = 'https://doi.org/'+r.get('relatedIdentifier','')
-            rels[r.get('relatedIdentifier','')] = {
+            rels['r'+str(i)] = {
                 'url': u2, 
-                'type': r.get('relationType','')}
+                'type': 'WWW:LINK',
+                'title': r.get('relationType','')}
     return rels
 
 def DOIContactstoMCF(cnts):
@@ -365,6 +366,15 @@ def DOIContactstoMCF(cnts):
 def arrit(obj,key,default):
     return (obj.get(key,[default])+[default])[0]
 
+def parse_report_file(file):
+    with open(file, 'r') as unknown_file:
+        # Remove tabs, spaces, and new lines when reading
+        data = re.sub(r'\s+', '', unknown_file.read())
+        if (re.match(r'^<.+>$', data)):
+            return 'Is XML'
+        if (re.match(r'^({|[).+(}|])$', data)):
+            return 'Is JSON'
+        return 'Is INVALID'
 
 def fetchMetadata(u):
     ''' fetch metadata of a url, first determine type then parse it '''
@@ -374,63 +384,77 @@ def fetchMetadata(u):
 
     if 'doi.org' in u:
         #try:
-        if 1==1:
-            resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
-        
-            if resp.status_code == 200:
-                dmd = json.loads(resp.text)
-                attrs = dmd.get('data',{}).get('attributes',{})
-                md = {
-                    'metadata': { 
-                        'identifier': u.split('doi.org/')[1],
-                        'dates': {
-                            'creation': attrs.get('created',''),
-                            'publication': attrs.get('published',''),
-                        }
-                    },
-                    'identification': {
-                        'title': arrit(attrs,'titles',{}).get('title',''),
-                        'abstract': arrit(attrs,'descriptions',{}).get('description','')
-                    },
-                    'contact': DOIContactstoMCF(attrs.get('creators',[]) + attrs.get('contributors',[])),
-                    'distribution': DOIRelations(
-                        attrs.get('contentUrl',u),
-                        attrs.get('relatedIdentifiers',[]))
-                }
-                # todo: parse DOI
-                return md
-            else:
-                print('doi 404', u) # todo: retrieve instead the citation
-        #except Exception as e:
-        #    print('no resp at',u,e) 
-        
+        resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+        if resp.status_code == 200:
+            md = parseDataCite(resp.text,u)  
+            return md
+        else:
+            print('doi 404', u) # todo: retrieve instead the citation
     else:
-        # check if a csw request
+        # Try a generic request
+        resp = req.get(u, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+        restype = resp.headers['Content-Type']
+        if (restype == 'application/json'):
+            md = parseDataCite(resp.text,u)
+            # datapackage, stac, ogcapi-records, etc....   
+        elif (restype == 'application/xml' or restype == 'text/xml'):
+            # datacite can also be in xml
+            md = parseISO(resp.text,u)
+        else:
+            # yaml parser
+            print('No parser for',restype,'at',u)
+        return md
+
+def parseDataCite(strJSON,u):
+    attrs = json.loads(strJSON)
+    # some datacite embeds content in data.attributes
+    if ('data' in attrs and 'attributes' in attrs['data']):
+        attrs = attrs.get('data',{}).get('attributes',{})
+    md = {
+        'metadata': { 
+            'identifier': safeFileName(u.split('//')[-1].split('?')[0]),
+        },
+        'identification': {
+            'title': arrit(attrs,'titles',{}).get('title',''),
+            'abstract': arrit(attrs,'descriptions',{}).get('description',''),
+            'dates': {}
+        },
+        'contact': DOIContactstoMCF(attrs.get('creators',[]) + attrs.get('contributors',[])),
+        'distribution': DOIRelations(u, attrs.get('relatedIdentifiers',[]))
+    }
+    for v in attrs.get('dates',[]):
+        md['identification']['dates'][v.get('dateType','creation').lower()] = v.get('date','')
+    if attrs['publicationYear']:
+        md['identification']['dates']['publication'] = str(attrs['publicationYear'])
+    for v in attrs.get('rightsList',[]):
+        md['identification']['rights'] = v.get('rightsURI',v.get('rightsIdentifier',''))
+    if attrs.get('types'):
+        md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset')
+        if attrs.get('types'):
+            md['spatial'] = {"type":attrs.get('types').get('resourceType','')}
+    return md
+
+def parseISO(strXML):
+    # check if a csw request
+    if 'getrecordbyid' in u.lower():
         try:
-            resp = req.get(u, verify=False, timeout=5, headers={'accept': 'application/xml;q=0.9, */*;q=0.8'})
+            doc = etree.fromstring(strXML)
+        except ValueError:
+            doc = etree.fromstring(bytes(strXML, 'utf-8'))
+        nsmap = {}
+        for ns in doc.xpath('//namespace::*'):
+            if ns[0]:
+                nsmap[ns[0]] = ns[1]
+        md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
+        strXML = etree.tostring(md[0])
 
-            strXML = resp.text
+    try:
+        iso_os = ISO19139OutputSchema()
+        md = iso_os.import_(strXML)
+        return md
+    except Exception as e:
+        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
 
-            if 'getrecordbyid' in u.lower():
-                try:
-                    doc = etree.fromstring(strXML)
-                except ValueError:
-                    doc = etree.fromstring(bytes(strXML, 'utf-8'))
-                nsmap = {}
-                for ns in doc.xpath('//namespace::*'):
-                    if ns[0]:
-                        nsmap[ns[0]] = ns[1]
-                md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
-                strXML = etree.tostring(md[0])
-
-            try:
-                iso_os = ISO19139OutputSchema()
-                md = iso_os.import_(strXML)
-                return md
-            except Exception as e:
-                print('no iso19139 at',u,e) # could parse url to find param id (csw request)
-        except Exception as e:
-            print('no resp at',u,e) 
 
 def owsCapabilities2md (url, protocol):
     lyrmd  = None; 

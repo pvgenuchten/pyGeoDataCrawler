@@ -151,7 +151,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     target.pop('robot')
                                 md = read_mcf(target)
                                 #yaml to iso/dcat
-                                print('md2xml',md)
+                                #print('md2xml',md)
                                 if schemaPath and os.path.exists(schemaPath):
                                     xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
                                 else:
@@ -186,7 +186,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
                         if 'dataseturi' in orig['metadata'] and orig['metadata']['dataseturi'] is not None:
                             for u in orig['metadata']['dataseturi'].split(';'):
-                                print(u)
                                 md = fetchMetadata(u)
                                 dict_merge(orig, md)
                                 skipOWS = True
@@ -420,6 +419,9 @@ def importCsv(dir,dir_out,map,sep,cluster):
                         if not 'metadata' in yMcf:
                             yMcf['metadata'] = {}
                         yMcf['metadata']['identifier'] = myid
+                    else:
+                        # make sure this is a valid identifier string, no special chars
+                        yMcf['metadata']['identifier'] = safeFileName(myid) 
                     # write out the yml
                     print("Save to file",fldr+safeFileName(myid)+'.yml')
                     with open(fldr+safeFileName(myid)+'.yml', 'w+') as f:
