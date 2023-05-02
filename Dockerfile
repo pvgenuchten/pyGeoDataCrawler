@@ -39,7 +39,7 @@ RUN gdal-config --version
 RUN poetry run pip install GDAL==3.4.3
 #RUN poetry add gdal==3.4.3
 RUN poetry install
-RUN poetry build
-RUN poetry shell
+#RUN poetry build
+#RUN poetry shell
 
-# ENTRYPOINT ["tail", "-f", "/dev/null"]
+ENTRYPOINT ["tail", "-f", "/dev/null"]
