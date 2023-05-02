@@ -108,13 +108,13 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
         if file.is_dir() and not fname.startswith('.') and not fname.startswith('~'):
             # go one level deeper
             print('process path: '+ str(file))
-            
             processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root)
         else:
             # process the file
             fname = str(file)
             if '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
+                relPath=os.sep.join(base.replace(root,'').split(os.sep)[:-1])
                 fn = base.split('/').pop()
                 #relPath=base.replace(root,'')
                 if extension.lower() in ["yml","yaml","mcf"] and fn != "index":
@@ -144,7 +144,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                         target['distribution']['webdav']= {'url': webdavUrl + '/' +  fn, 'name': fn, 'type': 'WWW:LINK'}
                                 if canonicalUrl: # add a canonical url referencing the source record (facilitates: edit me on git)
                                     if 'canonical' not in target['distribution'] or target['distribution']['canonical'] is None:
-                                        target['distribution']['canonical'] = {'url': canonicalUrl + target_path + os.sep + fn + '.yml', 'name': 'Source of the record', 'type': 'canonical', 'rel': 'canonical' }
+                                        target['distribution']['canonical'] = {'url': canonicalUrl + relPath + os.sep + fn + '.yml', 'name': 'Source of the record', 'type': 'canonical', 'rel': 'canonical' }
                                 if target['contact'] is None or len(target['contact'].keys()) == 0:
                                     target['contact'] = {'example':{'organization':'Unknown'}}
                                 if 'robot' in target:
@@ -315,7 +315,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 # mode==init
                 elif extension.lower() in INDEX_FILE_TYPES:
                     print ('Indexing file ' + fname)
-                    relPath=os.sep.join(base.replace(root,'').split(os.sep)[:-1])
                     if (dir_out_mode=='flat'):
                         outBase = dir_out+os.sep+fn
                     else:    
