@@ -1,3 +1,10 @@
+## [1.0.18](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.17...1.0.18) (2023-05-02)
+
+
+### Bug Fixes
+
+* use proper entrypoint ([0b80c4d](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/0b80c4d0cb5ce1df90636b413a4da03bb1e10def))
+
 ## [1.0.17](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.16...1.0.17) (2023-05-02)
 
 
