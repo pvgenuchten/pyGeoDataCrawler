@@ -1,3 +1,10 @@
+## [1.0.17](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.16...1.0.17) (2023-05-02)
+
+
+### Bug Fixes
+
+* build now plz ([1e4cd1e](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/1e4cd1ea5ad2980c58ab5cade732a8c0aebff65a))
+
 ## [1.0.16](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.15...1.0.16) (2023-05-02)
 
 
