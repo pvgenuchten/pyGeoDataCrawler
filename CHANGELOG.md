@@ -1,3 +1,10 @@
+## [1.0.16](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.15...1.0.16) (2023-05-02)
+
+
+### Bug Fixes
+
+* use relative path for git url ([34b193f](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/34b193fc9e89be18ddb132d6840107deac05480b))
+
 ## [1.0.15](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.14...1.0.15) (2023-03-06)
 
 
