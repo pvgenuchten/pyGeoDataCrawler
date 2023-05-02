@@ -107,6 +107,9 @@ poetry run crawl-metadata --mode=export --dir=../../ejpsoil/ejpsoildatahub/datas
 
 ```
 
+## Image build
+
+use pycsw image as a base if need also pycsw admin
 
 ## WSL-webdav specific
 
