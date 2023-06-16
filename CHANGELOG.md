@@ -1,3 +1,10 @@
+## [1.0.19](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.18...1.0.19) (2023-06-16)
+
+
+### Bug Fixes
+
+* filter by format includes dist/protocol ([6cd4532](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/6cd4532a0b3f5cbf64e74345a78b344bf215e4fa))
+
 ## [1.0.18](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.17...1.0.18) (2023-05-02)
 
 
