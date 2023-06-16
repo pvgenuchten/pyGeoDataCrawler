@@ -126,3 +126,5 @@ sudo mkdir /mnt/z
 sudo mount -t drvfs Z: /mnt/z
 ```
 
+## Log
+- june 2023, updated to latest pycsw, this now indexes dist/protocol as format, so terria can filter by 'wms'
