@@ -1,4 +1,4 @@
-FROM harbor.containers.wurnet.nl/isric/pycsw:2.9.7
+FROM harbor.containers.wurnet.nl/isric/pycsw:2.9.10
 #locally, build pcsw image first as docker build -t isric/pycsw .
 #FROM isric/pycsw:latest
 #FROM geopython/pycsw
