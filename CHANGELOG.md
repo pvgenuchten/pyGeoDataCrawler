@@ -1,3 +1,10 @@
+## [1.0.20](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.19...1.0.20) (2023-06-16)
+
+
+### Bug Fixes
+
+* use latest pycsw ([ad13f38](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/ad13f38294bbcd63f875954f00cb4c4e124cc899))
+
 ## [1.0.19](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.18...1.0.19) (2023-06-16)
 
 
