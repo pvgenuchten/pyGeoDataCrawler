@@ -1,3 +1,10 @@
+## [1.1.0](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.20...1.1.0) (2023-07-31)
+
+
+### Features
+
+* pip release ([687efc7](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/687efc781b34a60d7e8f6751878ec6b7d1499303))
+
 ## [1.0.20](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.19...1.0.20) (2023-06-16)
 
 
