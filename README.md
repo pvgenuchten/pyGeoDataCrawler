@@ -76,7 +76,7 @@ poetry run crawl-mapfile --dir=/mnt/data
 or run a shell in the poetry env
 
 ```
-poetry shell
+poetry shell 
 ```
 
 The GDAL dependency has some installation issue on poetry, see [here](https://stackoverflow.com/a/70986804) for a workaround
@@ -107,6 +107,9 @@ poetry run crawl-metadata --mode=export --dir=../../ejpsoil/ejpsoildatahub/datas
 
 ```
 
+## Image build
+
+use pycsw image as a base if need also pycsw admin
 
 ## WSL-webdav specific
 
@@ -123,3 +126,5 @@ sudo mkdir /mnt/z
 sudo mount -t drvfs Z: /mnt/z
 ```
 
+## Log
+- june 2023, updated to latest pycsw, this now indexes dist/protocol as format, so terria can filter by 'wms'

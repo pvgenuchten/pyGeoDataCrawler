@@ -1,8 +1,11 @@
 [tool.poetry]
 name = "geodatacrawler"
-version = "0.1.1"
-description = ""
-authors = ["Paul van Genuchten <paul.vangenuchten@wur.nl>"]
+version = "0.1.2"
+license = "MIT"
+description = "a crawler script to extract and author metadata of spatial datasets"
+authors = ["Paul van Genuchten <genuchten@yahoo.com>"]
+readme = "README.md"
+repository = "https://github.com/pvgenuchten/pyGeoDataCrawler"
 packages = [
     { include = "geodatacrawler" },
     { include = "geodatacrawler/templates/*" },
@@ -22,6 +25,7 @@ pygeometa = "0.13.1"
 pandas = "^1.5.1"
 Jinja2 = "^3.1.2"
 jinja2-time = "^0.2.0"
+bibtexparser = "^1.4.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

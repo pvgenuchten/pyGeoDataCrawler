@@ -4,18 +4,22 @@ import time
 import sys
 import pprint
 import urllib.request
+from copy import deepcopy
 import fiona
 from pyproj import CRS
 from osgeo import gdal, osr
 from urllib.parse import urlparse, parse_qsl
 from owslib.iso import *
 from owslib.etree import etree
+import json
+import requests as req
+from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 
 from pprint import pprint
 
-INDEX_FILE_TYPES = ['html', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xml', 'json']
+INDEX_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
 GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'xls']
+VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 
 fiona.supported_drivers["OGR_VRT"] = "r"
@@ -32,13 +36,12 @@ def indexSpatialFile(fname, extension):
     # else extract metadata from file (or update metadata from file content)
     try:
         content = {
-            'identifier': os.path.splitext(fname)[0].replace('/','-'),
             'title': os.path.splitext(os.path.basename(fname))[0],
             'url': fname,
             'date': time.ctime(os.path.getmtime(fname))
         }
-    except FileNotFoundError:
-        print("File {0} does not exist".format(fname))
+    except Exception as e:
+        print("Error set file",fname,e)
         return
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
@@ -64,6 +67,10 @@ def indexSpatialFile(fname, extension):
             srcband.ComputeStatistics(0)
         mn=srcband.GetMinimum()
         mx=srcband.GetMaximum()
+        ct = srcband.GetColorTable()
+        clrTable = []
+        if ct:
+            clrTable = {str(i): list(ct.GetColorEntry(i)) for i in range(ct.GetCount())}
         
         content['bounds'] = [ulx, lry, lrx, uly]
         content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
@@ -73,17 +80,20 @@ def indexSpatialFile(fname, extension):
         content['crs'] = epsg
 
         content['content_info'] = {
-                "type": "image",
-                "dimensions": [{
+                'type': 'image',
+                'dimensions': [{
                     "resolution": xres,
                     "min": mn,
                     "max": mx,
                     "width": int(d.RasterXSize),
-                    "height": int(d.RasterYSize)
-                }]
+                    "height": int(d.RasterYSize),
+                    "colors": clrTable
+                }],
+                'meta':  d.GetMetadata()
             }
-        content['meta'] = d.GetMetadata()
 
+
+    
         d = None
 
     elif extension in VECTOR_FILE_TYPES:
@@ -154,7 +164,6 @@ def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
         epsg = crs.to_epsg()
     except Exception as e:
         print('Invalid src (wkt) provided: ', e)
-        return None
     if not epsg:
         if (wkt == 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'):
             return "epsg:42106"
@@ -205,6 +214,8 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         return {}
     matchedLayers = {}
 
+    # 3 situations can occur; name=single, name=mulitple, name=all
+
     if '//' not in url: # this fails if url has '//' elsewhere
         url = '//'+url
     # mapsever uses ?map=xxx to create unique endpoints, we need to include 'map' in unique key for a service
@@ -225,50 +236,66 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         capabs = OWSCapabilitiesCache['WMS'][owsbase]
         if capabs:
 
+            idf = dict(capabs);
+
+            capmd = {
+                'mcf':{'version':'1.0'},
+                'identification': idf['identification'],
+                'contact': idf['contact'],
+                'distribution':{}
+            }
+            #only copy contact if it is not empty
+            #if (idf.get('contact',{}).get('distributor',{}).get('organization','') != '' 
+            #    or idf.get('contact',{}).get('distributor',{}).get('individualName','') != ''):
+            #    capmd['contact'] = idf['contact']
+
+            if 'keywords' in capmd['identification'] and hasattr(capmd['identification']['keywords'], "__len__"):
+                capmd['identification']['keywords'] = {'default': {'keywords': capmd['identification']['keywords']}}
+            
             # if service only has 1 layer
-            if len(capabs.get('distribution',{}).items()) == 1:
-                print('match single layer')
-                return capabs['distribution']
+            if len(idf.get('distribution',{}).items()) == 1: #todo: what if 1 (root)layer without name + 1 layer with name
+                return prepCapabsResponse(capmd, idf['distribution'])
 
             # check if layers in url, a linkage convention used in Flanders and Canada 
             qs2 = dict(parse_qsl(parsed.query))
             if 'layers' in qs2:
-                name = qs2['layers']
-            
+                name = qs2['layers'].split(',')
             # check if dist.name in layer capabilities (todo: do this only once, not every run?) 
-            if name not in [None,'']:
+            if name is not None:
                 # in some cases name is a string
                 if isinstance(name, str):
                     name = name.split(',')
-                for l in name: # name may contain multiple layers
-                    if l in capabs.get('distribution',{}):
-                        matchedLayers[l] = capabs['distribution'][l]
-            if len(matchedLayers.keys())>0: 
-                print('match on dist.name', name)
-                return matchedLayers
+                for l in name: # name may contain multiple layers (or all)
+                    if name == 'ALL':
+                        matchedLayers = idf.get('distribution',{})
+                    else:
+                        for k,wl in idf.get('distribution',{}).items():
+                            for l in name:
+                                if wl.get('name','').upper() == l.upper():
+                                    matchedLayers[k] = wl
+                if len(matchedLayers.keys()) > 0: 
+                    print('match on dist.name', name)
+                    return prepCapabsResponse(capmd, matchedLayers)
 
             # check if metadataurl matches identifier (todo: or import all metadata)
             if identifier not in [None,'']:
-                for k,v in capabs.get('distribution',{}).items():
-                    if 'metadataUrls' in v and len(v['metadataUrls']) > 0:
-                        for u in v['metadataUrls']:
-                            if identifier in u.get('url','') and u.get('format','') == 'text/xml':
-                                try: 
-                                    # fetch url with owslib, see if can parse, or write xml to disk?
-                                    # m=MD_Metadata(etree.parse(u))
-                                    print('metadata link', u.get('url',''))
-                                except Exception as e:
-                                    print('Failed parsing',u,e)
+                for k,v in idf.get('distribution',{}).items():
+                    for aUrl in v['metadataUrls']:
+                        if identifier in aUrl['url']:
+                            matchedLayers[k] = dict(v)
+                if len(matchedLayers.keys()) > 0: 
+                    print('match on identifier', identifier)
+                    return prepCapabsResponse(capmd, matchedLayers)
 
             # match by title? 
             if title not in [None,'']:
-                for k,v in capabs.get('distribution',{}).items():
+                for k,v in idf.get('distribution',{}).items():
                     if (v.get('name').lower().strip() == title.lower().strip() 
                         or v.get('title').lower().strip() == title.lower().strip()):
-                        matchedLayers[k] = capabs['distribution'][k]
-            if len(matchedLayers.keys())>0: 
-                print('match on title', title)
-                return matchedLayers
+                        matchedLayers[k] = idf['distribution'][k]
+                if len(matchedLayers.keys())>0: 
+                    print('match on title', title)
+                    return prepCapabsResponse(capmd, matchedLayers)
             
             # not found matched layer?
                 # suggestion for a layer?? 
@@ -279,7 +306,162 @@ def checkOWSLayer(url, protocol, name, identifier, title):
     else:
         print(protocol,'not implemented',url,identifier)
     
-    return matchedLayers
+    return None
+
+
+def prepCapabsResponse(CoreMD,lyrs):
+    ''' prepares owslib-layers before being returned, returns only unique layers '''
+    lyrs2 = {}
+    for k,v in lyrs.items():
+        if 'metadataUrls' in v and len(v['metadataUrls']) > 0:
+            
+            if len(v['metadataUrls']) == 1: # todo: check if metadataurl already used
+                md = fetchMetadata(v['metadataUrls'][0]['url'])
+            elif len(v['metadataUrls']) > 1:    
+                for u in v['metadataUrls']:
+                    if (u['url'] not in [None,''] and (
+                    'http://www.isotc211.org/2005/gmd' in u['url'] or # csw request / geonode    
+                    u.get('format','') == 'text/xml' )): 
+                        mu = u
+                if not mu: #take first
+                    mu = v['metadataUrls'][0]
+                md = fetchMetadata(mu['url'])
+                        
+            if md:
+                v['metaidentifier'] = md.get('metadata',{}).get('identifier','')
+                # todo: owslib does not capture the v.identifier element
+                v['meta'] = md
+        lyrs2[k] = v #leave untouched
+            
+    CoreMD['distribution'] = lyrs2
+
+    return CoreMD 
+
+def DOIRelations(doi, relations):
+    rels = {}
+    if (doi):
+        rels['contentUrl'] = {'url': doi, 'type': 'WWW:LINK', 'title': 'Link'}
+    for i, r in enumerate(relations):
+        if r.get('relatedIdentifierType','')=='DOI' and r.get('relatedIdentifier','') != '':
+            u2 = 'https://doi.org/'+r.get('relatedIdentifier','')
+            rels['r'+str(i)] = {
+                'url': u2, 
+                'type': 'WWW:LINK',
+                'title': r.get('relationType','')}
+    return rels
+
+def DOIContactstoMCF(cnts):
+    cnts2 = {}
+    for c in cnts:
+        o = (c.get('affiliation',[''])+[''])[0]
+        n = c.get('name',c.get('familyName',''))
+        if (n or o):
+            cnts2[safeFileName(n or o)] = {
+                'individualname': n,
+                'role': c.get('contributorType',''),
+                'organization': o,
+                'url': arrit(c,'nameIdentifiers',{}).get('nameIdentifier','')}    
+
+    return cnts2
+
+def arrit(obj,key,default):
+    return (obj.get(key,[default])+[default])[0]
+
+def parse_report_file(file):
+    with open(file, 'r') as unknown_file:
+        # Remove tabs, spaces, and new lines when reading
+        data = re.sub(r'\s+', '', unknown_file.read())
+        if (re.match(r'^<.+>$', data)):
+            return 'Is XML'
+        if (re.match(r'^({|[).+(}|])$', data)):
+            return 'Is JSON'
+        return 'Is INVALID'
+
+def fetchMetadata(u):
+    ''' fetch metadata of a url, first determine type then parse it '''
+    # analyse url
+    if not (u.strip().startswith('http') or u.strip().startswith('//')):
+        return None
+
+    if 'doi.org' in u:
+        try:
+            resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            if resp.status_code == 200:
+                md = parseDataCite(resp.text,u)  
+                return md
+            else:
+                print('doi 404', u) # todo: retrieve instead the citation
+        except Exception as e:
+                print("Failed to fetch ",u.split('doi.org/')[1],str(e))
+    else:
+        # Try a generic request
+        try:
+            resp = req.get(u, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            restype = resp.headers['Content-Type']
+            md = {}
+            if (restype == 'application/json'):
+                md = parseDataCite(resp.text,u)
+                # datapackage, stac, ogcapi-records, etc....   
+            elif (restype == 'application/xml' or restype == 'text/xml'):
+                # datacite can also be in xml
+                md = parseISO(resp.text,u)
+            else:
+                # yaml parser
+                print('No parser for',restype,'at',u)
+            return md
+        except Exception as e:
+                print("Failed to fetch",u,str(e))    
+
+def parseDataCite(strJSON,u):
+    attrs = json.loads(strJSON)
+    # some datacite embeds content in data.attributes
+    if ('data' in attrs and 'attributes' in attrs['data']):
+        attrs = attrs.get('data',{}).get('attributes',{})
+    md = {
+        'metadata': { 
+            'identifier': safeFileName(u.split('://')[-1].split('?')[0]),
+        },
+        'identification': {
+            'title': arrit(attrs,'titles',{}).get('title',''),
+            'abstract': arrit(attrs,'descriptions',{}).get('description',''),
+            'dates': {}
+        },
+        'contact': DOIContactstoMCF(attrs.get('creators',[]) + attrs.get('contributors',[])),
+        'distribution': DOIRelations(u, attrs.get('relatedIdentifiers',[]))
+    }
+    for v in attrs.get('dates',[]):
+        md['identification']['dates'][v.get('dateType','creation').lower()] = v.get('date','')
+    if attrs['publicationYear']:
+        md['identification']['dates']['publication'] = str(attrs['publicationYear'])
+    for v in attrs.get('rightsList',[]):
+        md['identification']['rights'] = v.get('rightsURI',v.get('rightsIdentifier',''))
+    if attrs.get('types'):
+        md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset')
+        if attrs.get('types'):
+            md['spatial'] = {"type":attrs.get('types').get('resourceType','')}
+    return md
+
+def parseISO(strXML):
+    # check if a csw request
+    if 'getrecordbyid' in u.lower():
+        try:
+            doc = etree.fromstring(strXML)
+        except ValueError:
+            doc = etree.fromstring(bytes(strXML, 'utf-8'))
+        nsmap = {}
+        for ns in doc.xpath('//namespace::*'):
+            if ns[0]:
+                nsmap[ns[0]] = ns[1]
+        md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
+        strXML = etree.tostring(md[0])
+
+    try:
+        iso_os = ISO19139OutputSchema()
+        md = iso_os.import_(strXML)
+        return md
+    except Exception as e:
+        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+
 
 def owsCapabilities2md (url, protocol):
     lyrmd  = None; 
@@ -287,21 +469,21 @@ def owsCapabilities2md (url, protocol):
     if protocol == 'WMS':
         from owslib.wms import WebMapService
         try:
-            wms = WebMapService(url, version='1.3.0', headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
+            wms = WebMapService(url, version='1.3.0', timeout=5, headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
         except Exception as e:
             print('no wms 1.3',e)
             try:
-                wms = WebMapService(url, version='1.1.1', headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
+                wms = WebMapService(url, version='1.1.1', timeout=5, headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
             except Exception as e:
                 print("Fetch WMS 1.1.1 " + url + " failed. " + str(e))
         if (wms):
-            print ('version:',wms.identification.version)
+            print ('Parse url',url,'WMS version:',wms.identification.version)
             idf = wms.identification
-            lyrmd = { 'title': idf.title,
+            lyrmd = { "identification":{   'title': idf.title,
                         'abstract': idf.abstract,
                         'keywords': idf.keywords,
                         'accessconstraints': idf.accessconstraints,
-                        'fees': idf.fees }
+                        'fees': idf.fees }}
             lyrmd['contact'] = {
                 'distributor': {
                     'organization': wms.provider.name,
@@ -334,3 +516,12 @@ def owsCapabilities2md (url, protocol):
         print(protocol,'not implemented')
     
     return lyrmd
+
+def safeFileName(n):
+    ''' remove unsafe characters from a var to make it safe'''
+
+    for i in ['(',')','[',']','{','}','&','~','%','+',',']:
+        n = n.replace(i,'')
+    for i in ['#',' ','!','+','/','\\',':',';']:
+        n = n.replace(i,'-')
+    return n
