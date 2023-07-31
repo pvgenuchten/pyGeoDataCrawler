@@ -9,13 +9,10 @@ identification:
   keywords:
     default:
       keywords:
-          - ""
   fees: None
   accessconstraints: otherRestrictions
-  rights: ""
+  rights: 
   topiccategory:
     - geoscientificInformation
 contact:
     pointOfContact: 
-        organization: ""
-        email: ""

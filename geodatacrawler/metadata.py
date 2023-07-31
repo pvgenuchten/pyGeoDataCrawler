@@ -255,6 +255,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                                 'rights': owsCapabs.get('accessconstraints',''),
                                                                 'fees': owsCapabs.get('fees','')
                                                             },
+                                                            'contact': owsCapabs.get('contact',{}),
                                                             'distribution': { 
                                                                 'wms': {
                                                                     'name': l['name'],
@@ -396,8 +397,9 @@ def importCsv(dir,dir_out,map,sep,cluster):
                     except Error as e:
                         print('Failed parsing',mcf,e)
                 except Error as e:
-                    print('Failed substituting',md,e)
+                    print('Failed substituting',md,e)    
                 if yMcf:
+                    
                     # which folder to write to?
                     fldr = dir_out
                     if cluster not in [None,""] and cluster in md.keys():
@@ -407,23 +409,28 @@ def importCsv(dir,dir_out,map,sep,cluster):
                         os.makedirs(fldr)
                         print('folder',fldr,'created')
                     # which id to use
-                    myid = yMcf.get('metadata',{}).get('identifier')
+                    # check identifier
+                    if not 'metadata' in yMcf:
+                        yMcf['metadata'] = {}
+                    myid = yMcf['metadata'].get('identifier')
                     if myid in [None,'']:
-                        myid = md5(yMcf.get('identification',{}).get('title',str(uuid.uuid1())).encode()).hexdigest()
-                        if myid == '':
-                            myid = str(uuid.uuid1());
+                        myid = str(uuid.uuid1());
                         # prepend cluster in id
                         # if cluster not in [None,""] and cluster in md.keys():
                         #    myid = md[cluster] + '-' + myid
-                        if not 'metadata' in yMcf:
-                            yMcf['metadata'] = {}
                         yMcf['metadata']['identifier'] = myid
-                    else:
-                        # make sure this is a valid identifier string, no special chars
-                        yMcf['metadata']['identifier'] = safeFileName(myid) 
+                    elif myid.startswith('http') or myid.startswith('ftp'):
+                        myid = myid.split('://')[1].split('?')[0]
+                        domains = ["drive.google.com/file/d","doi.org","data.europa.eu","researchgate.net/publication","handle.net","osf.io","library.wur.nl","freegisdata.org/record"]
+                        for d in domains:
+                            myid = myid.split(d+'/')[-1]
+
+                    myid = safeFileName(myid)
+                    yMcf['metadata']['identifier'] = myid
+
                     # write out the yml
-                    print("Save to file",fldr+safeFileName(myid)+'.yml')
-                    with open(fldr+safeFileName(myid)+'.yml', 'w+') as f:
+                    print("Save to file",fldr+myid+'.yml')
+                    with open(fldr+myid+'.yml', 'w+') as f:
                         yaml.dump(yMcf, f, sort_keys=False)
 
 def insert_or_update(content, db, dbtype):

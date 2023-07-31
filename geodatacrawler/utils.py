@@ -240,13 +240,14 @@ def checkOWSLayer(url, protocol, name, identifier, title):
 
             capmd = {
                 'mcf':{'version':'1.0'},
-                'identification' : idf['identification'],
+                'identification': idf['identification'],
+                'contact': idf['contact'],
                 'distribution':{}
             }
             #only copy contact if it is not empty
-            if (idf.get('contact',{}).get('distributor',{}).get('organization','') != '' 
-                or idf.get('contact',{}).get('distributor',{}).get('individualName','') != ''):
-                capmd['contact'] = idf['contact']
+            #if (idf.get('contact',{}).get('distributor',{}).get('organization','') != '' 
+            #    or idf.get('contact',{}).get('distributor',{}).get('individualName','') != ''):
+            #    capmd['contact'] = idf['contact']
 
             if 'keywords' in capmd['identification'] and hasattr(capmd['identification']['keywords'], "__len__"):
                 capmd['identification']['keywords'] = {'default': {'keywords': capmd['identification']['keywords']}}
@@ -383,27 +384,33 @@ def fetchMetadata(u):
         return None
 
     if 'doi.org' in u:
-        #try:
-        resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
-        if resp.status_code == 200:
-            md = parseDataCite(resp.text,u)  
-            return md
-        else:
-            print('doi 404', u) # todo: retrieve instead the citation
+        try:
+            resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            if resp.status_code == 200:
+                md = parseDataCite(resp.text,u)  
+                return md
+            else:
+                print('doi 404', u) # todo: retrieve instead the citation
+        except Exception as e:
+                print("Failed to fetch ",u.split('doi.org/')[1],str(e))
     else:
         # Try a generic request
-        resp = req.get(u, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
-        restype = resp.headers['Content-Type']
-        if (restype == 'application/json'):
-            md = parseDataCite(resp.text,u)
-            # datapackage, stac, ogcapi-records, etc....   
-        elif (restype == 'application/xml' or restype == 'text/xml'):
-            # datacite can also be in xml
-            md = parseISO(resp.text,u)
-        else:
-            # yaml parser
-            print('No parser for',restype,'at',u)
-        return md
+        try:
+            resp = req.get(u, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            restype = resp.headers['Content-Type']
+            md = {}
+            if (restype == 'application/json'):
+                md = parseDataCite(resp.text,u)
+                # datapackage, stac, ogcapi-records, etc....   
+            elif (restype == 'application/xml' or restype == 'text/xml'):
+                # datacite can also be in xml
+                md = parseISO(resp.text,u)
+            else:
+                # yaml parser
+                print('No parser for',restype,'at',u)
+            return md
+        except Exception as e:
+                print("Failed to fetch",u,str(e))    
 
 def parseDataCite(strJSON,u):
     attrs = json.loads(strJSON)
@@ -412,7 +419,7 @@ def parseDataCite(strJSON,u):
         attrs = attrs.get('data',{}).get('attributes',{})
     md = {
         'metadata': { 
-            'identifier': safeFileName(u.split('//')[-1].split('?')[0]),
+            'identifier': safeFileName(u.split('://')[-1].split('?')[0]),
         },
         'identification': {
             'title': arrit(attrs,'titles',{}).get('title',''),
@@ -515,6 +522,6 @@ def safeFileName(n):
 
     for i in ['(',')','[',']','{','}','&','~','%','+',',']:
         n = n.replace(i,'')
-    for i in ['#',' ','!','+','/','\\']:
+    for i in ['#',' ','!','+','/','\\',':',';']:
         n = n.replace(i,'-')
     return n
