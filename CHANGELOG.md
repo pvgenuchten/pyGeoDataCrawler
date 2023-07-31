@@ -1,3 +1,60 @@
+## [1.1.0](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.20...1.1.0) (2023-07-31)
+
+
+### Features
+
+* pip release ([687efc7](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/687efc781b34a60d7e8f6751878ec6b7d1499303))
+
+## [1.0.20](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.19...1.0.20) (2023-06-16)
+
+
+### Bug Fixes
+
+* use latest pycsw ([ad13f38](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/ad13f38294bbcd63f875954f00cb4c4e124cc899))
+
+## [1.0.19](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.18...1.0.19) (2023-06-16)
+
+
+### Bug Fixes
+
+* filter by format includes dist/protocol ([6cd4532](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/6cd4532a0b3f5cbf64e74345a78b344bf215e4fa))
+
+## [1.0.18](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.17...1.0.18) (2023-05-02)
+
+
+### Bug Fixes
+
+* use proper entrypoint ([0b80c4d](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/0b80c4d0cb5ce1df90636b413a4da03bb1e10def))
+
+## [1.0.17](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.16...1.0.17) (2023-05-02)
+
+
+### Bug Fixes
+
+* build now plz ([1e4cd1e](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/1e4cd1ea5ad2980c58ab5cade732a8c0aebff65a))
+
+## [1.0.16](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.15...1.0.16) (2023-05-02)
+
+
+### Bug Fixes
+
+* use relative path for git url ([34b193f](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/34b193fc9e89be18ddb132d6840107deac05480b))
+
+## [1.0.15](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.14...1.0.15) (2023-03-06)
+
+
+### Bug Fixes
+
+* test build ([fcb1fbe](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/fcb1fbed6dc4ecc8b182350b80357e938a2fc107))
+
+## [1.0.14](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.13...1.0.14) (2023-03-06)
+
+
+### Bug Fixes
+
+* update node version ([fd92788](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/fd92788259558d569fa170a1f05e6e8dcb34fedf))
+* update to 19.7 ([2a34f12](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/2a34f12f3f5cc3a500d9274562391cab9b3ca2b6))
+
 ## [1.0.13](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.12...1.0.13) (2022-12-01)
 
 

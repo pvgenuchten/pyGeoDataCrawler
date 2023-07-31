@@ -240,13 +240,14 @@ def checkOWSLayer(url, protocol, name, identifier, title):
 
             capmd = {
                 'mcf':{'version':'1.0'},
-                'identification' : idf['identification'],
+                'identification': idf['identification'],
+                'contact': idf['contact'],
                 'distribution':{}
             }
             #only copy contact if it is not empty
-            if (idf.get('contact',{}).get('distributor',{}).get('organization','') != '' 
-                or idf.get('contact',{}).get('distributor',{}).get('individualName','') != ''):
-                capmd['contact'] = idf['contact']
+            #if (idf.get('contact',{}).get('distributor',{}).get('organization','') != '' 
+            #    or idf.get('contact',{}).get('distributor',{}).get('individualName','') != ''):
+            #    capmd['contact'] = idf['contact']
 
             if 'keywords' in capmd['identification'] and hasattr(capmd['identification']['keywords'], "__len__"):
                 capmd['identification']['keywords'] = {'default': {'keywords': capmd['identification']['keywords']}}
@@ -272,17 +273,19 @@ def checkOWSLayer(url, protocol, name, identifier, title):
                             for l in name:
                                 if wl.get('name','').upper() == l.upper():
                                     matchedLayers[k] = wl
-            if len(matchedLayers.keys())>0: 
-                print('match on dist.name', name)
-                return prepCapabsResponse(capmd, matchedLayers)
+                if len(matchedLayers.keys()) > 0: 
+                    print('match on dist.name', name)
+                    return prepCapabsResponse(capmd, matchedLayers)
 
             # check if metadataurl matches identifier (todo: or import all metadata)
             if identifier not in [None,'']:
                 for k,v in idf.get('distribution',{}).items():
-                    for x,y in v['metadataUrls']:
-                        if identifier in y['url']:
-                            matchedLayers[k] = v
-                return prepCapabsResponse(capmd, matchedLayers)
+                    for aUrl in v['metadataUrls']:
+                        if identifier in aUrl['url']:
+                            matchedLayers[k] = dict(v)
+                if len(matchedLayers.keys()) > 0: 
+                    print('match on identifier', identifier)
+                    return prepCapabsResponse(capmd, matchedLayers)
 
             # match by title? 
             if title not in [None,'']:
@@ -290,9 +293,9 @@ def checkOWSLayer(url, protocol, name, identifier, title):
                     if (v.get('name').lower().strip() == title.lower().strip() 
                         or v.get('title').lower().strip() == title.lower().strip()):
                         matchedLayers[k] = idf['distribution'][k]
-            if len(matchedLayers.keys())>0: 
-                print('match on title', title)
-                return prepCapabsResponse(capmd, matchedLayers)
+                if len(matchedLayers.keys())>0: 
+                    print('match on title', title)
+                    return prepCapabsResponse(capmd, matchedLayers)
             
             # not found matched layer?
                 # suggestion for a layer?? 
@@ -303,7 +306,7 @@ def checkOWSLayer(url, protocol, name, identifier, title):
     else:
         print(protocol,'not implemented',url,identifier)
     
-    return prepCapabsResponse(capmd, matchedLayers)
+    return None
 
 
 def prepCapabsResponse(CoreMD,lyrs):
@@ -311,8 +314,9 @@ def prepCapabsResponse(CoreMD,lyrs):
     lyrs2 = {}
     for k,v in lyrs.items():
         if 'metadataUrls' in v and len(v['metadataUrls']) > 0:
+            
             if len(v['metadataUrls']) == 1: # todo: check if metadataurl already used
-                md = fetchMetadata(u)
+                md = fetchMetadata(v['metadataUrls'][0]['url'])
             elif len(v['metadataUrls']) > 1:    
                 for u in v['metadataUrls']:
                     if (u['url'] not in [None,''] and (
@@ -322,21 +326,56 @@ def prepCapabsResponse(CoreMD,lyrs):
                 if not mu: #take first
                     mu = v['metadataUrls'][0]
                 md = fetchMetadata(mu['url'])
-                if md:
-                    v['metaidentifier'] = md.identifier
-                    if md.identioninfo.get('uricode','') != '': # l.identifier should be the same as uricode
-                        v['identifier'] = md.identioninfo.get('uricode','')
-                    v['metadata'] = md
-        if v.get('metaidentifier','') != '':
-            lyrs2[v.metaidentifier] = v # multiple layers with same metadata uuid will be overwritten -> md will be used, assuming it has a reverse link to all layers
-        elif v.get('identifier','') != '':
-            lyrs2[v.identifier] = v
-        else:
-            lyrs2[k] = v #leave untouched
+                        
+            if md:
+                v['metaidentifier'] = md.get('metadata',{}).get('identifier','')
+                # todo: owslib does not capture the v.identifier element
+                v['meta'] = md
+        lyrs2[k] = v #leave untouched
             
     CoreMD['distribution'] = lyrs2
 
     return CoreMD 
+
+def DOIRelations(doi, relations):
+    rels = {}
+    if (doi):
+        rels['contentUrl'] = {'url': doi, 'type': 'WWW:LINK', 'title': 'Link'}
+    for i, r in enumerate(relations):
+        if r.get('relatedIdentifierType','')=='DOI' and r.get('relatedIdentifier','') != '':
+            u2 = 'https://doi.org/'+r.get('relatedIdentifier','')
+            rels['r'+str(i)] = {
+                'url': u2, 
+                'type': 'WWW:LINK',
+                'title': r.get('relationType','')}
+    return rels
+
+def DOIContactstoMCF(cnts):
+    cnts2 = {}
+    for c in cnts:
+        o = (c.get('affiliation',[''])+[''])[0]
+        n = c.get('name',c.get('familyName',''))
+        if (n or o):
+            cnts2[safeFileName(n or o)] = {
+                'individualname': n,
+                'role': c.get('contributorType',''),
+                'organization': o,
+                'url': arrit(c,'nameIdentifiers',{}).get('nameIdentifier','')}    
+
+    return cnts2
+
+def arrit(obj,key,default):
+    return (obj.get(key,[default])+[default])[0]
+
+def parse_report_file(file):
+    with open(file, 'r') as unknown_file:
+        # Remove tabs, spaces, and new lines when reading
+        data = re.sub(r'\s+', '', unknown_file.read())
+        if (re.match(r'^<.+>$', data)):
+            return 'Is XML'
+        if (re.match(r'^({|[).+(}|])$', data)):
+            return 'Is JSON'
+        return 'Is INVALID'
 
 def fetchMetadata(u):
     ''' fetch metadata of a url, first determine type then parse it '''
@@ -345,21 +384,83 @@ def fetchMetadata(u):
         return None
 
     if 'doi.org' in u:
-        resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'})
-        if resp.status_code == 200:
-            aDOI = json.loads(resp.text)
-            md = {aDOI} # todo: parse DOI
-            return md
-        else:
-            print('doi 404', u) # todo: retrieve instead the citation
-    else:    
         try:
-            resp = req.get(u)
-            iso_os = ISO19139OutputSchema()
-            md = iso_os.import_(resp.text)
+            resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            if resp.status_code == 200:
+                md = parseDataCite(resp.text,u)  
+                return md
+            else:
+                print('doi 404', u) # todo: retrieve instead the citation
+        except Exception as e:
+                print("Failed to fetch ",u.split('doi.org/')[1],str(e))
+    else:
+        # Try a generic request
+        try:
+            resp = req.get(u, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            restype = resp.headers['Content-Type']
+            md = {}
+            if (restype == 'application/json'):
+                md = parseDataCite(resp.text,u)
+                # datapackage, stac, ogcapi-records, etc....   
+            elif (restype == 'application/xml' or restype == 'text/xml'):
+                # datacite can also be in xml
+                md = parseISO(resp.text,u)
+            else:
+                # yaml parser
+                print('No parser for',restype,'at',u)
             return md
         except Exception as e:
-            print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+                print("Failed to fetch",u,str(e))    
+
+def parseDataCite(strJSON,u):
+    attrs = json.loads(strJSON)
+    # some datacite embeds content in data.attributes
+    if ('data' in attrs and 'attributes' in attrs['data']):
+        attrs = attrs.get('data',{}).get('attributes',{})
+    md = {
+        'metadata': { 
+            'identifier': safeFileName(u.split('://')[-1].split('?')[0]),
+        },
+        'identification': {
+            'title': arrit(attrs,'titles',{}).get('title',''),
+            'abstract': arrit(attrs,'descriptions',{}).get('description',''),
+            'dates': {}
+        },
+        'contact': DOIContactstoMCF(attrs.get('creators',[]) + attrs.get('contributors',[])),
+        'distribution': DOIRelations(u, attrs.get('relatedIdentifiers',[]))
+    }
+    for v in attrs.get('dates',[]):
+        md['identification']['dates'][v.get('dateType','creation').lower()] = v.get('date','')
+    if attrs['publicationYear']:
+        md['identification']['dates']['publication'] = str(attrs['publicationYear'])
+    for v in attrs.get('rightsList',[]):
+        md['identification']['rights'] = v.get('rightsURI',v.get('rightsIdentifier',''))
+    if attrs.get('types'):
+        md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset')
+        if attrs.get('types'):
+            md['spatial'] = {"type":attrs.get('types').get('resourceType','')}
+    return md
+
+def parseISO(strXML):
+    # check if a csw request
+    if 'getrecordbyid' in u.lower():
+        try:
+            doc = etree.fromstring(strXML)
+        except ValueError:
+            doc = etree.fromstring(bytes(strXML, 'utf-8'))
+        nsmap = {}
+        for ns in doc.xpath('//namespace::*'):
+            if ns[0]:
+                nsmap[ns[0]] = ns[1]
+        md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
+        strXML = etree.tostring(md[0])
+
+    try:
+        iso_os = ISO19139OutputSchema()
+        md = iso_os.import_(strXML)
+        return md
+    except Exception as e:
+        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
 
 
 def owsCapabilities2md (url, protocol):
@@ -368,11 +469,11 @@ def owsCapabilities2md (url, protocol):
     if protocol == 'WMS':
         from owslib.wms import WebMapService
         try:
-            wms = WebMapService(url, version='1.3.0', headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
+            wms = WebMapService(url, version='1.3.0', timeout=5, headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
         except Exception as e:
             print('no wms 1.3',e)
             try:
-                wms = WebMapService(url, version='1.1.1', headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
+                wms = WebMapService(url, version='1.1.1', timeout=5, headers={'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'})
             except Exception as e:
                 print("Fetch WMS 1.1.1 " + url + " failed. " + str(e))
         if (wms):
@@ -419,8 +520,8 @@ def owsCapabilities2md (url, protocol):
 def safeFileName(n):
     ''' remove unsafe characters from a var to make it safe'''
 
-    for i in ['(',')','[',']','{','}','&','~','%','+']:
+    for i in ['(',')','[',']','{','}','&','~','%','+',',']:
         n = n.replace(i,'')
-    for i in ['#',' ','!','+']:
+    for i in ['#',' ','!','+','/','\\',':',';']:
         n = n.replace(i,'-')
     return n

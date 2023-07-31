@@ -1,6 +1,7 @@
-FROM harbor.containers.wurnet.nl/isric/pycsw:2.9.7
+FROM harbor.containers.wurnet.nl/isric/pycsw:2.9.11 
 #locally, build pcsw image first as docker build -t isric/pycsw .
 #FROM isric/pycsw:latest
+#FROM geopython/pycsw
 
 USER root
 
@@ -38,5 +39,7 @@ RUN gdal-config --version
 RUN poetry run pip install GDAL==3.4.3
 #RUN poetry add gdal==3.4.3
 RUN poetry install
+#RUN poetry build
+#RUN poetry shell
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]
