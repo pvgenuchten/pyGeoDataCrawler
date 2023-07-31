@@ -11,9 +11,16 @@ Several options exist for using the results of the generated index:
 
 ## Installation
 
-The tool requires GDAL 3.3.2 to be installed
+The tool requires GDAL 3.2.2 and pysqlite 0.4.6 to be installed. I recommend to use [conda](https://conda.io/) to install them.
 
-Then run
+```
+conda create --name pgdc python=3.9 
+conda activate pgdc
+conda install -c conda-forge gdal==3.3.2
+conda install -c conda-forge pysqlite3==0.4.6
+```
+
+Then run:
 
 ```
 pip install geodatacrawler
