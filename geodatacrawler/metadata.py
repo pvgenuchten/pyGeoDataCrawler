@@ -88,7 +88,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cl
                 print('creating out folder ' + dir_out)
                 os.makedirs(dir_out)
         else:
-            print("postgis not supported")
+            print("Export format "+dbtype+" not supported")
 
     # core metadata gets populated by merging the index.yaml content from parent folders
     initialMetadata = load_default_metadata(mode)
@@ -508,7 +508,11 @@ def merge_folder_metadata(coreMetadata, path, mode):
 
 def load_default_metadata(mode):
     initial = merge_folder_metadata({},'.',mode)
+    if not 'identification' in initial:
+        initial['identification'] = {}
     initial['identification']['dates'] = {"publication": datetime.date.today()}
+    if not 'metadata' in initial:
+        initial['metadata'] = {} 
     initial['metadata']['datestamp'] = datetime.date.today()
     return initial
 
