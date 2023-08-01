@@ -160,10 +160,10 @@ def dict_merge(dct, merge_dct):
 
 def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
     try:
-        crs = CRS.from_wkt(wkt)
+        crs = CRS.from_wkt(wkt.get('init',wkt))
         epsg = crs.to_epsg()
     except Exception as e:
-        print('Invalid src (wkt) provided: ', e)
+        print('Invalid src (wkt) provided: ', e,'proj:', wkt)
     if not epsg:
         if (wkt == 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'):
             return "epsg:42106"
