@@ -1,3 +1,10 @@
+## [1.1.2](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.1...1.1.2) (2023-08-01)
+
+
+### Bug Fixes
+
+* paths in metadata ([0192324](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/01923247ef5ce8fbd8561a5363827613bd3c1188))
+
 ## [1.1.1](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.0...1.1.1) (2023-07-31)
 
 
