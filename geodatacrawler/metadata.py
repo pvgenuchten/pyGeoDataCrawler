@@ -49,7 +49,7 @@ def indexFile(fname):
               required=True, help="Directory as source for mapfile")
 @click.option('--dir-out', nargs=1,
               required=False, help="Directory as target for the generated files")
-@click.option('--dir-out-mode', nargs=1, required=False, help="flat|nested indicates if files in output folder are nested")
+@click.option('--dir-out-mode', nargs=1, required=False, help="nested|flat indicates if files in output folder are nested")
 @click.option('--mode', nargs=1, required=False, help="metadata mode init [update] [export] [import-csv]") 
 @click.option('--dbtype', nargs=1, required=False, help="export db type path [sqlite] [postgres]")  
 @click.option('--profile', nargs=1, required=False, help="export to profile iso19139 [dcat]")   
@@ -67,7 +67,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cl
     elif dir_out[-1] == os.sep:
         dir_out = dir_out[:-1]
     if not dir_out_mode or dir_out_mode not in ["flat","nested"]:
-        dir_out_mode = "flat"
+        dir_out_mode = "nested"
     if not mode:
         mode = "init"
     elif  mode not in ["init","update","export","import-csv"]:
@@ -124,8 +124,8 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 if extension.lower() in ["yml","yaml","mcf"] and fn != "index":
                     if mode == "export":
                         ### export a file
-                        try:
-                            #if 1==1:
+                        #try:
+                        if 1==1:
                             with open(fname, mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 if not cnf:
@@ -167,12 +167,12 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     if dir_out_mode == "flat":
                                         pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.xml')
                                     else:
-                                        pth = os.path.join(target_path,os.sep,safeFileName(md['metadata']['identifier'])+'.xml')
+                                        pth = os.path.join(target_path,safeFileName(md['metadata']['identifier'])+'.xml')
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
                                         print('iso19139 xml generated at '+pth)    
-                        except Exception as e:
-                            print('Failed to create xml:',target_path,os.sep,base+'.xml',e)
+                        #except Exception as e:
+                        #    print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e)
                     elif mode=='update':
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:

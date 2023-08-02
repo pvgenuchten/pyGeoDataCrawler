@@ -22,7 +22,7 @@
   {% if key in ['distributor', 'pointOfContact'] %}
   <gmd:contact>
     {% set contact = value %}
-    {% set role = key %}
+    {% set role = contact['role'] or key %}
     {% include "contact.j2" %}
   </gmd:contact>
   {% endif %}

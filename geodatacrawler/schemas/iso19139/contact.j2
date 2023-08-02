@@ -1,7 +1,8 @@
+{% if contact and not contact is string %}
 <gmd:CI_ResponsibleParty>
-  {{ cs.get_freetext('individualName', record['metadata']['language_alternate'], get_charstring(contact.get('individualname'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
-  {{ cs.get_freetext('organisationName', record['metadata']['language_alternate'], get_charstring(contact.get('organization'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
-  {{ cs.get_freetext('positionName', record['metadata']['language_alternate'], get_charstring(contact.get('positionname'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+  {{ cs.get_freetext('individualName', record['metadata']['language_alternate'], get_charstring(contact['individualname'], record['metadata']['language'], record['metadata']['language_alternate'])) }}
+  {{ cs.get_freetext('organisationName', record['metadata']['language_alternate'], get_charstring(contact['organization'], record['metadata']['language'], record['metadata']['language_alternate'])) }}
+  {{ cs.get_freetext('positionName', record['metadata']['language_alternate'], get_charstring(contact['positionname'], record['metadata']['language'], record['metadata']['language_alternate'])) }}
   <gmd:contactInfo>
     <gmd:CI_Contact>
       {% if contact['phone'] %}
@@ -51,3 +52,4 @@
     <gmd:CI_RoleCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#CI_RoleCode" codeSpace="ISOTC211/19115" codeListValue="{{ role.split('_') | first }}">{{ role }}</gmd:CI_RoleCode>
   </gmd:role>
 </gmd:CI_ResponsibleParty>
+{% endif %}
