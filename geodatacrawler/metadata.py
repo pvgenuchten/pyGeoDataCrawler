@@ -27,12 +27,12 @@ webdavUrl = os.getenv('pgdc_webdav_url')
 canonicalUrl = os.getenv('pgdc_canonical_url')
 schemaPath = os.getenv('pgdc_schema_path')
 if not schemaPath:
-    schemaPath = "/mnt/c/Users/genuc003/Projects/geopython/pyGeoDataCrawler/geodatacrawler/schemas"
+    schemaPath = os.path.join(os.path.dirname(__file__),"schemas")
 
 # for supported formats, see apache tika - http://tika.apache.org/1.4/formats.html
 TEXT_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'kmz']
+GRID_FILE_TYPES = ['tif', 'grib2', 'nc', 'vrt']
+VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'gpkg', 'kmz']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 INDEX_FILE_TYPES = SPATIAL_FILE_TYPES + TEXT_FILE_TYPES
 
@@ -49,7 +49,7 @@ def indexFile(fname):
               required=True, help="Directory as source for mapfile")
 @click.option('--dir-out', nargs=1,
               required=False, help="Directory as target for the generated files")
-@click.option('--dir-out-mode', nargs=1, required=False, help="flat|nested indicates if files in output folder are nested")
+@click.option('--dir-out-mode', nargs=1, required=False, help="nested|flat indicates if files in output folder are nested")
 @click.option('--mode', nargs=1, required=False, help="metadata mode init [update] [export] [import-csv]") 
 @click.option('--dbtype', nargs=1, required=False, help="export db type path [sqlite] [postgres]")  
 @click.option('--profile', nargs=1, required=False, help="export to profile iso19139 [dcat]")   
@@ -60,12 +60,14 @@ def indexFile(fname):
 def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cluster):
     if not dir:
         dir = "./"
-    if dir[-1] != "/":
-        dir += "/"
+    if dir[-1] == os.sep:
+        dir = dir[:-1]
     if not dir_out:
         dir_out = dir
+    elif dir_out[-1] == os.sep:
+        dir_out = dir_out[:-1]
     if not dir_out_mode or dir_out_mode not in ["flat","nested"]:
-        dir_out_mode = "flat"
+        dir_out_mode = "nested"
     if not mode:
         mode = "init"
     elif  mode not in ["init","update","export","import-csv"]:
@@ -77,7 +79,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cl
         db = dir   
     if not profile or profile not in ["iso19139","dcat"]:
         profile = "iso19139"    
-    print(mode + ' metadata in ' + dir + ' as ' + profile + ' in ' + db)
+    print(mode + ' metadata in ' + dir + ' to ' + dir_out)
 
     if mode=="export":
         if dbtype == 'sqlite':   
@@ -114,14 +116,15 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
             fname = str(file)
             if '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
-                relPath=os.sep.join(base.replace(root,'').split(os.sep)[:-1])
-                fn = base.split('/').pop()
+                relPath = os.path.relpath(os.path.dirname(file), root)
+                if relPath == '1':
+                    relPath == ''
+                fn = base.split(os.sep).pop()
                 #relPath=base.replace(root,'')
                 if extension.lower() in ["yml","yaml","mcf"] and fn != "index":
                     if mode == "export":
                         ### export a file
                         try:
-                            #if 1==1:
                             with open(fname, mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 if not cnf:
@@ -163,12 +166,12 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     if dir_out_mode == "flat":
                                         pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.xml')
                                     else:
-                                        pth = os.path.join(target_path,os.sep,safeFileName(md['metadata']['identifier'])+'.xml')
+                                        pth = os.path.join(target_path,safeFileName(md['metadata']['identifier'])+'.xml')
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
                                         print('iso19139 xml generated at '+pth)    
                         except Exception as e:
-                            print('Failed to create xml:',target_path,os.sep,base+'.xml',e)
+                            print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e)
                     elif mode=='update':
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:
@@ -317,9 +320,9 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 elif extension.lower() in INDEX_FILE_TYPES:
                     print ('Indexing file ' + fname)
                     if (dir_out_mode=='flat'):
-                        outBase = dir_out+os.sep+fn
+                        outBase = os.path.join(dir_out,fn)
                     else:    
-                        outBase = dir_out+os.sep+relPath+os.sep+fn
+                        outBase = os.path.join(dir_out,relPath,fn)
 
                     yf = os.path.join(outBase+'.yml')
                     if not os.path.exists(yf): # only if yml not exists yet
@@ -344,9 +347,9 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 lnk = str(file)
                             md['distribution']['local'] = { 'url':lnk, 'type': 'WWW:LINK', 'name':fn+'.'+extension }
 
-                        if not os.path.exists(dir_out+os.sep+relPath):
-                            os.makedirs(dir_out+os.sep+relPath)
-                            print('create folder',dir_out+os.sep+relPath)
+                        if not os.path.exists(os.path.join(dir_out,relPath)):
+                            os.makedirs(os.path.join(dir_out,relPath))
+                            print('create folder',os.path.join(dir_out,relPath))
                         # write yf
                         try:
                             with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
@@ -404,7 +407,7 @@ def importCsv(dir,dir_out,map,sep,cluster):
                     fldr = dir_out
                     if cluster not in [None,""] and cluster in md.keys():
                         # todo, safe string, re.sub('[^A-Za-z0-9]+', '', cluster)
-                        fldr += md[cluster] + os.sep
+                        fldr = os.path.join(fldr, md[cluster])
                     if not os.path.isdir(fldr):
                         os.makedirs(fldr)
                         print('folder',fldr,'created')
@@ -429,8 +432,8 @@ def importCsv(dir,dir_out,map,sep,cluster):
                     yMcf['metadata']['identifier'] = myid
 
                     # write out the yml
-                    print("Save to file",fldr+myid+'.yml')
-                    with open(fldr+myid+'.yml', 'w+') as f:
+                    print("Save to file",os.path.join(fldr,myid+'.yml'))
+                    with open(os.path.join(fldr,myid+'.yml'), 'w+') as f:
                         yaml.dump(yMcf, f, sort_keys=False)
 
 def insert_or_update(content, db, dbtype):

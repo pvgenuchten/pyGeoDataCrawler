@@ -1,3 +1,17 @@
+## [1.1.2](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.1...1.1.2) (2023-08-01)
+
+
+### Bug Fixes
+
+* paths in metadata ([0192324](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/01923247ef5ce8fbd8561a5363827613bd3c1188))
+
+## [1.1.1](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.0...1.1.1) (2023-07-31)
+
+
+### Bug Fixes
+
+* update readme, downgrade pysqlite3, to facilitate conda ([26b66ac](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/26b66ac678672080b7529cb9be80477a04c793a4))
+
 ## [1.1.0](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.20...1.1.0) (2023-07-31)
 
 
