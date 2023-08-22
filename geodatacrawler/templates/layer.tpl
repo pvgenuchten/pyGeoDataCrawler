@@ -10,7 +10,6 @@ LAYER
     Template '{template}'
 
     METADATA
-        'ows_onlineresource'         '{owsurl}'
         'ows_title'                 {title}
         'ows_abstract'              {abstract}
         'ows_extent'                '{extent}'
@@ -20,6 +19,7 @@ LAYER
         'ows_metadataurl_href'      '{mdurl}'
         'wms_include_items'         'all'
         'gml_include_items'         'all'
+        'gml_featureid'             'id'
     END
     {classes}
 END

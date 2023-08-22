@@ -62,7 +62,12 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
     cnf2 = coreMetadata.get('robot',{})
     dict_merge(config, cnf2)
     
-    print(config)
+
+    skipLeafs = False
+    if 'skip-leafs' in cnf2:
+        skipLeafs = cnf2['skip-leafs']
+
+    # print(config)
 
     # initalise folder mapfile
     tpl = pkg_resources.open_text(templates, 'default.map')
@@ -110,9 +115,10 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
     for file in Path(config['rootDir']+relPath).iterdir():
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and recursive and not fname.startswith('.'):
-            # go one level deeper
-            print('process path: '+ str(file))
-            processPath(relPath+os.sep+fname, deepcopy(coreMetadata), dir_out, dir_out_mode, recursive, deepcopy(config))
+            if not skipLeafs:
+                # go one level deeper
+                print('process path: '+ str(file))
+                processPath(relPath+os.sep+fname, deepcopy(coreMetadata), dir_out, dir_out_mode, recursive, deepcopy(config))
         else:
             # process the file
             if '.' in str(file):

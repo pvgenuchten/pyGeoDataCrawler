@@ -18,8 +18,8 @@ from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from pprint import pprint
 
 INDEX_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg']
+GRID_FILE_TYPES = ['tif', 'grib2', 'nc', 'vrt']
+VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'gpkg']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 
 fiona.supported_drivers["OGR_VRT"] = "r"

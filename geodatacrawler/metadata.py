@@ -31,8 +31,8 @@ if not schemaPath:
 
 # for supported formats, see apache tika - http://tika.apache.org/1.4/formats.html
 TEXT_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg', 'kmz']
+GRID_FILE_TYPES = ['tif', 'grib2', 'nc', 'vrt']
+VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'gpkg', 'kmz']
 SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 INDEX_FILE_TYPES = SPATIAL_FILE_TYPES + TEXT_FILE_TYPES
 
@@ -124,8 +124,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 if extension.lower() in ["yml","yaml","mcf"] and fn != "index":
                     if mode == "export":
                         ### export a file
-                        #try:
-                        if 1==1:
+                        try:
                             with open(fname, mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 if not cnf:
@@ -171,8 +170,8 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
                                         print('iso19139 xml generated at '+pth)    
-                        #except Exception as e:
-                        #    print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e)
+                        except Exception as e:
+                            print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e)
                     elif mode=='update':
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:
