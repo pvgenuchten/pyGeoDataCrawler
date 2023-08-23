@@ -101,22 +101,36 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cl
         processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir)
 
 def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode, root):
-    if mode == 'export':
-        coreMetadata = merge_folder_metadata(parentMetadata, target_path, mode)
-    else:
-        coreMetadata = parentMetadata
+    
+    coreMetadata = merge_folder_metadata(parentMetadata, target_path, mode) 
+
+    cnf2 = coreMetadata.get('robot',{})
+
+    skipLeafs = False
+    if 'skip-leafs' in cnf2:
+        skipLeafs = cnf2['skip-leafs']
+
     for file in Path(target_path).iterdir():
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and not fname.startswith('.') and not fname.startswith('~'):
             # go one level deeper
-            print('process path: '+ str(file))
-            processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root)
+            if skipLeafs:
+                print('Skip path: '+ str(file))
+            else:
+                print('Process path: '+ str(file))
+                processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root)
         else:
             # process the file
             fname = str(file)
-            if '.' in str(file):
+            if 'skip-files' in cnf2 and cnf2['skip-files'] != '' and re.search(cnf2['skip-files'], fname):
+                print('Skip file',fname)
+            elif '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
-                relPath = os.path.relpath(os.path.dirname(file), root)
+                mydir = os.path.dirname(file)
+                relPath = ""
+                if mydir != "":
+                    relPath = os.path.relpath(os.path.dirname(file), root)
+                # why is this, maybe sould be len(rp)==1?
                 if relPath == '1':
                     relPath == ''
                 fn = base.split(os.sep).pop()
@@ -333,23 +347,24 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         if 'metadata' not in md or md['metadata'] is None:
                             md['metadata'] = {}
                         if 'identifier' not in md['metadata'] or md['metadata']['identifier'] in [None,'']:
-                            md['metadata']['identifier'] = relPath.replace(os.sep,'')+fn
+                            md['metadata']['identifier'] = str(os.path.join(relPath,fn)).replace(os.sep,'-')
                         if 'identification' not in md or md['identification'] is None:
                             md['identification'] = {}
                         if 'title' not in md['identification'] or md['identification']['title'] in [None,'']:
-                            md['identification']['title'] = fn
+                            md['identification']['title'] = str(os.path.join(relPath,fn)).replace(os.sep,' ')
                         if 'distribution' not in md or md['distribution'] is None:
                             md['distribution'] = {}
                         if len(md['distribution'].keys()) == 0:
                             if webdavUrl:
-                                lnk = webdavUrl+os.sep+relPath+os.sep+fn+'.'+extension
+                                lnk = webdavUrl+"/"+relPath+"/"+fn+'.'+extension
                             else:
                                 lnk = str(file)
                             md['distribution']['local'] = { 'url':lnk, 'type': 'WWW:LINK', 'name':fn+'.'+extension }
 
                         if not os.path.exists(os.path.join(dir_out,relPath)):
-                            os.makedirs(os.path.join(dir_out,relPath))
                             print('create folder',os.path.join(dir_out,relPath))
+                            os.makedirs(os.path.join(dir_out,relPath))
+                            
                         # write yf
                         try:
                             with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
@@ -495,18 +510,20 @@ def asPGM(dct):
     return exp
 
 def merge_folder_metadata(coreMetadata, path, mode):    
-    # if dir has index.yml merge it to parent
-    # print('merging',path,'index.yml',coreMetadata)
+    # if dir has index.yml merge it to paren
     f = os.path.join(path,'index.yml')
+    # print('merging',f,'&&',coreMetadata)
     if os.path.exists(f):   
-        print ('Indexing path ' + path)
-        prvPath = path
         with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
             pathMetadata = yaml.load(yf, Loader=SafeLoader)
             if pathMetadata and isinstance(pathMetadata, dict):
-                dict_merge(coreMetadata, pathMetadata)
-            return coreMetadata
+                dict_merge(pathMetadata, coreMetadata)
+            else:
+                print("can not parse",path)
+                return coreMetadata    
+            return pathMetadata
     else:
+        # print('no',f)
         return coreMetadata
 
 def load_default_metadata(mode):
