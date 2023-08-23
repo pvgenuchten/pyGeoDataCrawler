@@ -3,7 +3,7 @@
 from importlib.resources import path
 from copy import deepcopy
 import mappyfile, click, yaml
-import os, time, sys
+import os, time, sys, re
 import pprint
 import urllib.request
 from geodatacrawler.utils import indexSpatialFile, dict_merge
@@ -51,23 +51,21 @@ def mapForDir(dir, dir_out, dir_out_mode, recursive):
     config['webdavUrl'] = os.getenv('pgdc_webdav_url') or 'http://example.com/'
     config['mdLinkTypes'] = os.getenv('pgdc_md_link_types') or ['OGC:WMS','OGC:WFS','OGC:WCS']
 
-    processPath("", initialMetadata, dir_out, dir_out_mode, recursive, config)
+    initialMetadata['robot'] = config
 
-def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, config):
-    
-    
+    processPath("", initialMetadata, dir_out, dir_out_mode, recursive)
+
+def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
+
+    parentConfig = parentMetadata.get('robot',{})    
     # merge folder metadata
-    coreMetadata = merge_folder_metadata(parentMetadata, config['rootDir']+relPath, "update")
+    coreMetadata = merge_folder_metadata(parentMetadata, os.path.join(parentConfig['rootDir'],relPath), "update")
   
-    cnf2 = coreMetadata.get('robot',{})
-    dict_merge(config, cnf2)
-    
+    config = coreMetadata.get('robot',{})
 
-    skipLeafs = False
-    if 'skip-leafs' in cnf2:
-        skipLeafs = cnf2['skip-leafs']
-
-    # print(config)
+    skipSubfolders = False
+    if 'skip-subfolders' in config:
+        skipSubfolders = config['skip-subfolders']
 
     # initalise folder mapfile
     tpl = pkg_resources.open_text(templates, 'default.map')
@@ -111,17 +109,23 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
         mf["web"]["metadata"]["ows_attribution_onlineresource"] = first.get("url","")
     mf["web"]["metadata"]["ows_fees"] = coreMetadata.get('identification').get("fees","")
     mf["web"]["metadata"]["ows_accessconstraints"] = coreMetadata.get('identification').get("accessconstraints","") 
+    mf["web"]["metadata"]["ows_onlineresource"] = config['msUrl'] + '/' + mf["name"]
+    mf["web"]["metadata"]["oga_onlineresource"] = mf["web"]["metadata"]["ows_onlineresource"] + '/ogcapi'
 
-    for file in Path(config['rootDir']+relPath).iterdir():
+    for file in Path(os.path.join(config['rootDir'],relPath)).iterdir():
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and recursive and not fname.startswith('.'):
-            if not skipLeafs:
+            if skipSubfolders:
+                print('Skip path: '+ str(file))
+            else:
                 # go one level deeper
-                print('process path: '+ str(file))
-                processPath(relPath+os.sep+fname, deepcopy(coreMetadata), dir_out, dir_out_mode, recursive, deepcopy(config))
+                print('Process path: '+ str(file))
+                processPath(os.path.join(relPath,fname), deepcopy(coreMetadata), dir_out, dir_out_mode, recursive)
         else:
+            if 'skip-files' in config and config['skip-files'] != '' and re.search(config['skip-files'], fname):
+                print('Skip file',fname)
             # process the file
-            if '.' in str(file):
+            elif '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split(os.sep).pop()
                 # do we trigger on ymls only, or also on spatial files? to go back to the file from the yml works via distribution(s)?
@@ -139,17 +143,17 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
                             ly = cnt.get('robot',{}).get('map',{})
 
                             # prepare layer(s)
-                            print('found ',len(cnt.get('distribution',{}).items()), 'files in ',fname)
+                            # print('Found',len(cnt.get('distribution',{}).items()),'existing disributions in',fname)
 
                             for d,v in cnt.get('distribution',{}).items():
                                 # for each link check if local file exists
                                 parsed = urlparse(v.get('url',''))
                                 fn = str(parsed.path).split('/').pop()
-                                sf = config['rootDir'] + relPath + os.sep + fn
+                                sf = os.path.join(config['rootDir'], relPath , fn)
                                 if not v.get('type','').startswith('OGC:') and os.path.exists(sf):
                                     print('processing file' + sf)
-                                    b,e = str(fn).rsplit('.', 1)
-                                    if e.lower() in SPATIAL_FILE_TYPES:
+                                    fb,e = str(fn).rsplit('.', 1)
+                                    if e and e.lower() in SPATIAL_FILE_TYPES:
                                     # we better index the file again... to get band info etc
                                         fileinfo = indexSpatialFile(sf, e)
 
@@ -187,7 +191,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
                                             else: # vector
                                                 new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
                                         else: 
-                                            stylefile = config['rootDir']+relPath+os.sep+style_reference
+                                            stylefile = os.path.join(config['rootDir'],relPath,style_reference)
                                             if os.path.exists(stylefile):
                                                 with open(stylefile) as f1:
                                                     new_class_string2 = f1.read()
@@ -198,41 +202,40 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
                                                 
                                         new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
 
-                                        strLr = new_layer_string.format(name=b,
-                                                    owsurl=config['msUrl']+'/'+relPath,
+                                        strLr = new_layer_string.format(name=fb,
                                                     title='"'+cnt.get('identification',{}).get('title', '')+'"',
                                                     abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
                                                     type=fileinfo['type'],
-                                                    path=relPath.split(os.sep).pop()+os.sep+fn, # map is in parent
+                                                    path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
                                                     template=ly.get('template', 'info.html'),
                                                     projection=fileinfo['crs'],
                                                     projections=ly.get('projections', 'epsg:4326 epsg:3857'),
                                                     extent=" ".join(map(str,fileinfo['bounds'])),
-                                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',b)), # or use the externalid here (doi)
+                                                    id="fid", # todo, use field from attributes, config?
+                                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)), # or use the externalid here (doi)
                                                     classes=new_class_string2)
                                         #except Exception as e:
                                         #    print("Failed creation of layer {0}; {1}".format(cnt['name'], e))
                                             
-                                        #try:
-                                        mslr = mappyfile.loads(strLr)
+                                        try:
+                                            mslr = mappyfile.loads(strLr)
 
-                                        lyrs.insert(len(lyrs) + 1, mslr)
-                                        #except Exception as e:
-                                        #    print("Failed creation of layer {0}; {1}".format(b, e))
+                                            lyrs.insert(len(lyrs) + 1, mslr)
+                                        except Exception as e:
+                                            print("Failed creation of layer {0}; {1}".format(fb, e))
 
-                                        print (fileinfo['datatype'] )
                                         # does metadata already include a link to wms/wfs? else add it.
                                         for mdlinktype in config['mdLinkTypes']:
                                            
                                             if mdlinktype in ['OGC:WMS']:
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, b, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fn, file, relPath, mf['name'], config)
                                             elif fileinfo['datatype'] == 'raster' and mdlinktype == 'OGC:WCS':
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, b, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fn, file, relPath, mf['name'], config)
                                             elif fileinfo['datatype'] == 'vector' and mdlinktype == 'OGC:WFS' :
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, b, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fn, file, relPath, mf['name'], config)
 
     # map should have initial layer, remove it
     lyrs.pop(0)
@@ -240,9 +243,16 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
     # print(mappyfile.dumps(mf))
     # write to parent folder as {folder}.map
     if len(lyrs) > 0: # do not create mapfile if no layers
-        mapfile = str(dir_out + relPath + os.sep + '..' + os.sep + mf['name'] + ".map")
-        print(f'writing mapfile {mapfile}')
         
+        do = os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''))
+        mapfile =  os.path.join(do,mf['name'] + ".map")
+        
+        # check if folder exists
+        if not os.path.exists(do):
+            print('create folder',do)
+            os.makedirs(do)
+            
+        print(f'writing mapfile {mapfile}')
         mappyfile.save(mf, mapfile, 
             indent=4, spacer=' ', quote='"', newlinechar='\n',
             end_comment=False, align_values=False)

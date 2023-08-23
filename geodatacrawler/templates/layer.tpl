@@ -19,7 +19,7 @@ LAYER
         'ows_metadataurl_href'      '{mdurl}'
         'wms_include_items'         'all'
         'gml_include_items'         'all'
-        'gml_featureid'             'id'
+        'gml_featureid'             '{id}'
     END
     {classes}
 END
