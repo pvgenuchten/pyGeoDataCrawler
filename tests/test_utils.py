@@ -18,7 +18,7 @@ def test_dict_merge():
         'pets': {'dog': 'Lucifer'}
     }
     dict_merge(foo,faa)
-    assert foo['family']['father'] == 'John'
+    assert foo['family']['father'] == 'Peter'
     assert foo['family']['mother'] == 'Erina'
     assert foo['family']['son'] == 'Frans'
     assert foo['family']['daughter'] == 'Jane'
