@@ -1,3 +1,11 @@
+## [1.1.3](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.2...1.1.3) (2023-08-23)
+
+
+### Bug Fixes
+
+* optimize mapfiles generation, add skip-files/folders ([f83a0d3](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/f83a0d3d68a42d99b9b643d66c3f616aba160025))
+* update version nr ([86352b3](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/86352b3e7e7a3b5842a17d3467372054003d4fb1))
+
 ## [1.1.2](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.1...1.1.2) (2023-08-01)
 
 
