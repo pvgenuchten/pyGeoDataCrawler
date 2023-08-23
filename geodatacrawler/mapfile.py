@@ -63,9 +63,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
   
     config = coreMetadata.get('robot',{})
 
-    skipLeafs = False
-    if 'skip-leafs' in config:
-        skipLeafs = config['skip-leafs']
+    skipSubfolders = False
+    if 'skip-subfolders' in config:
+        skipSubfolders = config['skip-subfolders']
 
     # initalise folder mapfile
     tpl = pkg_resources.open_text(templates, 'default.map')
@@ -115,7 +115,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
     for file in Path(os.path.join(config['rootDir'],relPath)).iterdir():
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and recursive and not fname.startswith('.'):
-            if skipLeafs:
+            if skipSubfolders:
                 print('Skip path: '+ str(file))
             else:
                 # go one level deeper

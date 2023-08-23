@@ -51,6 +51,16 @@ Most parameters are configured from the commandline, check --help to get explana
 - pgdc_host is the url on which the data will be hosted in mapserver or a webdav folder.
 - pgdc_schema_path is a physical path to an override of the default iso19139 schema of pygeometa, containing jinja templates to format the exported xml
 
+Some parameters can be set in index.yml, in a robot section. Note that config is inherited from parent folders.
+
+```yaml
+mcf:
+    version 1.0
+robot: 
+  skip-subfolders: True # do not move into subfolders, typically if subfolder is a set of tiles, default: False 
+  skip-files: "temp.*" # do not process files matching a regexp, default: None 
+```
+
 ### Create mapfile
 
 The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A `index.yml` configuraton file is expected at the root of the folder to be indexed, if not, it will be created.

@@ -106,15 +106,15 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
 
     cnf2 = coreMetadata.get('robot',{})
 
-    skipLeafs = False
-    if 'skip-leafs' in cnf2:
-        skipLeafs = cnf2['skip-leafs']
+    skipSubfolders = False
+    if 'skip-subfolders' in cnf2:
+        skipSubfolders = cnf2['skip-subfolders']
 
     for file in Path(target_path).iterdir():
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and not fname.startswith('.') and not fname.startswith('~'):
             # go one level deeper
-            if skipLeafs:
+            if skipSubfolders:
                 print('Skip path: '+ str(file))
             else:
                 print('Process path: '+ str(file))
