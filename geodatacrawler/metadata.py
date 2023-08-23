@@ -517,7 +517,7 @@ def merge_folder_metadata(coreMetadata, path, mode):
         with open(os.path.join(f), mode="r", encoding="utf-8") as yf:
             pathMetadata = yaml.load(yf, Loader=SafeLoader)
             if pathMetadata and isinstance(pathMetadata, dict):
-                dict_merge(pathMetadata, coreMetadata)
+                dict_merge(coreMetadata, pathMetadata)
             else:
                 print("can not parse",path)
                 return coreMetadata    
