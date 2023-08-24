@@ -59,7 +59,7 @@
   </gmd:locale>
   {% endif %}
   <gmd:spatialRepresentationInfo>
-    {% if record['spatial']['datatype'] == 'vector' %}
+    {% if record.get('spatial',{}).get('datatype','') == 'vector' %}
     <gmd:MD_VectorSpatialRepresentation>
       <gmd:topologyLevel>
         <gmd:MD_TopologyLevelCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_TopologyLevelCode" codeSpace="ISOTC211/19115" codeListValue="geometryOnly">geometryOnly</gmd:MD_TopologyLevelCode>
@@ -67,7 +67,7 @@
       <gmd:geometricObjects>
         <gmd:MD_GeometricObjects>
           <gmd:geometricObjectType>
-            <gmd:MD_GeometricObjectTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_GeometricObjectTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['spatial']['geomtype'] }}">{{ record['spatial']['geomtype'] }}</gmd:MD_GeometricObjectTypeCode>
+            <gmd:MD_GeometricObjectTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_GeometricObjectTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('spatial',{}).get('geomtype','') }}">{{ record.get('spatial',{}).get('geomtype','') }}</gmd:MD_GeometricObjectTypeCode>
           </gmd:geometricObjectType>
         </gmd:MD_GeometricObjects>
       </gmd:geometricObjects>
@@ -191,7 +191,7 @@
         </gmd:MD_LegalConstraints>
       </gmd:resourceConstraints>
       <gmd:spatialRepresentationType>
-        <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['spatial']['datatype'] }}">{{ record['spatial']['datatype'] }}</gmd:MD_SpatialRepresentationTypeCode>
+        <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('spatial',{}).get('datatype','') }}">{{ record.get('spatial',{}).get('datatype','') }}</gmd:MD_SpatialRepresentationTypeCode>
       </gmd:spatialRepresentationType>
       {% if record['identification'].get('language') in ['inapplicable', 'missing', 'template', 'unknown', 'withheld'] %}
       <gmd:language gco:nilReason="{{ record['identification'].get('language') }}"/>
