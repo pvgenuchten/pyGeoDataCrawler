@@ -1,7 +1,7 @@
 import click, yaml
 import importlib.resources as pkg_resources
 from yaml.loader import SafeLoader
-import os
+import os, traceback
 import sqlite3
 from os import path
 from copy import deepcopy
@@ -85,7 +85,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cl
         if dbtype == 'sqlite':   
             dir_out = os.path.join(dir_out, db)
             createIndexIfDoesntExist(dir_out)
-        elif dbtype == "path":
+        elif dbtype == "path": # default
             if not os.path.exists(dir_out): 
                 print('creating out folder ' + dir_out)
                 os.makedirs(dir_out)
@@ -141,13 +141,14 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         try:
                             with open(fname, mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
+                                # make sure a identifier exists in metadata element
                                 if not cnf:
                                     cnf = { 'metadata':{ 'identifier': fn } }
                                 elif 'metadata' not in cnf or cnf['metadata'] is None: 
                                     cnf['metadata'] = { 'identifier': fn }
                                 elif 'identifier' not in cnf['metadata'] or cnf['metadata']['identifier'] in [None,""]:
                                     cnf['metadata']['identifier'] = fn
-                                target = deepcopy(coreMetadata)
+                                target = deepcopy(coreMetadata) # parent metadata
                                 dict_merge(target,cnf)
                                 # in many cases keywords are kept as array, not in the default thesaurus
                                 if 'identification' not in target:
@@ -185,7 +186,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                         ff.write(xml_string)
                                         print('iso19139 xml generated at '+pth)    
                         except Exception as e:
-                            print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e)
+                            print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e,traceback.format_exc())
                     elif mode=='update':
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:
@@ -519,12 +520,9 @@ def merge_folder_metadata(coreMetadata, path, mode):
             if pathMetadata and isinstance(pathMetadata, dict):
                 dict_merge(coreMetadata, pathMetadata)
             else:
-                print("can not parse",path)
-                return coreMetadata    
-            return pathMetadata
-    else:
-        # print('no',f)
-        return coreMetadata
+                print("can not parse",path)   
+    # print('no',f)
+    return coreMetadata
 
 def load_default_metadata(mode):
     initial = merge_folder_metadata({},'.',mode)
