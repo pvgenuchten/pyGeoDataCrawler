@@ -1,3 +1,10 @@
+## [1.1.4](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.3...1.1.4) (2023-08-25)
+
+
+### Bug Fixes
+
+* folder inheritence ([0dcb7dd](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/0dcb7ddfaec9c3c12be6ac8cec1c83f956a8e2f1))
+
 ## [1.1.3](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.2...1.1.3) (2023-08-23)
 
 
