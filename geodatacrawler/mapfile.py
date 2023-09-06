@@ -45,10 +45,10 @@ def mapForDir(dir, dir_out, dir_out_mode, recursive):
     # initial config (from program folder)
     config = initialMetadata.get('robot',{})
     config['rootDir'] = dir   
-    config['outDir'] = os.getenv('pgdc_out_dir') or dir_out
-    config['mdUrlPattern'] = os.getenv('pgdc_md_url') or 'http://example.com/{0}'
-    config['msUrl'] = os.getenv('pgdc_ms_url') or 'http://example.com/'
-    config['webdavUrl'] = os.getenv('pgdc_webdav_url') or 'http://example.com/'
+    config['outDir'] = os.getenv('pgdc_dir_out') or dir_out
+    config['mdUrlPattern'] = os.getenv('pgdc_md_url') or ''
+    config['msUrl'] = os.getenv('pgdc_ms_url') or ''
+    config['webdavUrl'] = os.getenv('pgdc_webdav_url') or ''
     config['mdLinkTypes'] = os.getenv('pgdc_md_link_types') or ['OGC:WMS','OGC:WFS','OGC:WCS']
 
     initialMetadata['robot'] = config
@@ -212,7 +212,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                                     projections=ly.get('projections', 'epsg:4326 epsg:3857'),
                                                     extent=" ".join(map(str,fileinfo['bounds'])),
                                                     id="fid", # todo, use field from attributes, config?
-                                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)), # or use the externalid here (doi)
+                                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
                                                     classes=new_class_string2)
                                         #except Exception as e:
                                         #    print("Failed creation of layer {0}; {1}".format(cnt['name'], e))
@@ -226,16 +226,16 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
                                         # does metadata already include a link to wms/wfs? else add it.
                                         for mdlinktype in config['mdLinkTypes']:
-                                           
+                                            relPath2 = relPath if dir_out_mode == 'nested' else ''
                                             if mdlinktype in ['OGC:WMS']:
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, fn, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
                                             elif fileinfo['datatype'] == 'raster' and mdlinktype == 'OGC:WCS':
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, fn, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
                                             elif fileinfo['datatype'] == 'vector' and mdlinktype == 'OGC:WFS' :
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, fn, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
 
     # map should have initial layer, remove it
     lyrs.pop(0)
@@ -278,8 +278,9 @@ def addLink(type, layer, file, relPath, map, config):
     # add link
         if 'distribution' not in orig.keys():
             orig['distribution'] = {}
+        msUrl2 = config['msUrl'] + ('/'+ relPath if relPath != '' else '')
         orig['distribution'][type.split(':').pop()] = {
-            'url': config['msUrl'] + relPath+'?service='+type.split(':').pop()+'&amp;request=GetCapabilities',
+            'url':  msUrl2 + '/' + map +'?service='+type.split(':').pop()+'&amp;request=GetCapabilities',
             'type': type,
             'name': layer,
             'description': ''

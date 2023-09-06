@@ -69,8 +69,22 @@ The metadata identified can be used to create OGC services exposing the files. C
 crawl-mapfile --dir=/mnt/data [--out-dir=/mnt/mapserver/mapfiles]
 ```
 
-A mapserver docker image is available which is able to expose a folder of mapfiles as mapservices, eg http://example.com/{mapfile}?request=getcapabilities&service=wms.
-Idea is that the url to the OGC service will be included in the indexed metadata.
+Some parameters in the mapfile can be set using environment variables:
+
+| Param | Description | Example |
+| --- | --- | --- |
+| **pgdc_out_dir** | a folder where files are placed (can override with --dir-out) | | 
+| **pgdc_md_url** | a pattern on how to link to metadata, use {0} to be substituted by record uuid, or empty to not include metadata link | https://example.com/{0} |
+| **pgdc_ms_url** | the base url of mapserver | http://example.com/maps |
+| **pgdc_webdav_url** | the base url on which data files are published or empty if not published | http://example.com/data |
+| **pgdc_md_link_types** | which service links to add | OGC:WMS,OGC:WFS,OGC:WCS,OGCAPI:Features |
+
+```bash
+export pgdc_webdav_url="https://example.com/data"
+```
+
+A [mapserver docker](https://github.com/camptocamp/docker-mapserver) image is provided by Camp to Camp which is able to expose a number of mapfiles as mapservices, eg http://example.com/{mapfile}?request=getcapabilities&service=wms. Each mapfile needs to be configured as alias in [mapserver config file](https://mapserver.org/mapfile/config.html).
+
 
 ## Development
 
