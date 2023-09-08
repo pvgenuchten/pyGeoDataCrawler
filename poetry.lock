@@ -111,6 +111,14 @@ optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 
 [[package]]
+name = "et-xmlfile"
+version = "1.1.0"
+description = "An implementation of lxml.xmlfile for the standard library"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
 name = "exceptiongroup"
 version = "1.1.3"
 description = "Backport of PEP 654 (exception groups)"
@@ -319,19 +327,22 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "numpy"
-version = "1.24.4"
-description = "Fundamental package for array computing in Python"
-category = "main"
-optional = false
-python-versions = ">=3.8"
-
-[[package]]
-name = "numpy"
 version = "1.25.2"
 description = "Fundamental package for array computing in Python"
 category = "main"
 optional = false
 python-versions = ">=3.9"
+
+[[package]]
+name = "openpyxl"
+version = "3.1.2"
+description = "A Python library to read/write Excel 2010 xlsx/xlsm files"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+et-xmlfile = "*"
 
 [[package]]
 name = "owslib"
@@ -611,7 +622,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-ena
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "d075b706f8339ef06a5a4fa5d2d01e8e656fd7294432865ed8ed9a01d2134184"
+content-hash = "13a6e4c652ed5d1e72130375eaeb6acd5dce8bb7303a1c0bcdaa27fb279f57be"
 
 [metadata.files]
 affine = []
@@ -624,6 +635,7 @@ click = []
 click-plugins = []
 cligj = []
 colorama = []
+et-xmlfile = []
 exceptiongroup = []
 fiona = []
 gdal = []
@@ -641,6 +653,7 @@ lxml = []
 mappyfile = []
 markupsafe = []
 numpy = []
+openpyxl = []
 owslib = []
 packaging = []
 pandas = []

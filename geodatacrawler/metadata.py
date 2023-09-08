@@ -9,7 +9,8 @@ from sqlite3 import Error
 import datetime
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from pygeometa.core import read_mcf, render_j2_template
-from geodatacrawler.utils import indexSpatialFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName
+from geodatacrawler.utils import indexFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName
+from geodatacrawler import GDCCONFIG
 from pathlib import Path
 import pandas as pd
 import uuid
@@ -25,24 +26,7 @@ from hashlib import md5
 
 webdavUrl = os.getenv('pgdc_webdav_url')
 canonicalUrl = os.getenv('pgdc_canonical_url')
-schemaPath = os.getenv('pgdc_schema_path')
-if not schemaPath:
-    schemaPath = os.path.join(os.path.dirname(__file__),"schemas")
-
-# for supported formats, see apache tika - http://tika.apache.org/1.4/formats.html
-TEXT_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc', 'vrt']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'gpkg', 'kmz']
-SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
-INDEX_FILE_TYPES = SPATIAL_FILE_TYPES + TEXT_FILE_TYPES
-
-def indexFile(fname):
-    # createEncodedTempFile(fname)
-    # postFileToTheIndex()
-    # os.remove(TMP_FILE_NAME)
-    # print ('-----------')
-    print('Saving: ' + fname)
-
+schemaPath = os.getenv('pgdc_schema_path') or os.path.join(os.path.dirname(__file__),"schemas")
 
 @click.command()
 @click.option('--dir', nargs=1, type=click.Path(exists=True),
@@ -314,8 +298,8 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     localFile = isDistributionLocal(v.get('url',''),target_path)
                                     if localFile:
                                         hasFile = localFile
-                                        cnt = indexSpatialFile(target_path+os.sep+hasFile, extension)
-                                        md2 = asPGM(cnt)
+                                        cnt = indexFile(target_path+os.sep+hasFile, extension)
+                                        md2 = asPGM(cnt,fname)
                                         if (md2['identification']['title']):
                                             md2['identification']['title'] = None
                                         if md2['metadata']['identifier']:
@@ -332,8 +316,8 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 print('Failed to dump yaml:',e)
 
                 # mode==init
-                elif extension.lower() in INDEX_FILE_TYPES:
-                    print ('Indexing file ' + fname)
+                elif extension.lower() in GDCCONFIG["INDEX_FILE_TYPES"]:
+                    # print ('Indexing file ' + fname)
                     if (dir_out_mode=='flat'):
                         outBase = os.path.join(dir_out,fn)
                     else:    
@@ -342,8 +326,8 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     yf = os.path.join(outBase+'.yml')
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
-                        cnt = indexSpatialFile(fname, extension) 
-                        md = asPGM(cnt)
+                        cnt = indexFile(fname, extension) 
+                        md = asPGM(cnt,fname)
                     
                         if 'metadata' not in md or md['metadata'] is None:
                             md['metadata'] = {}
@@ -483,18 +467,28 @@ def insert_or_update(content, db, dbtype):
     # elif index = postgis
 
 # format a index dict as pygeometa
-def asPGM(dct):
+def asPGM(dct,fname):
     tpl = pkg_resources.open_text(templates, 'PGM.tpl')
     exp = yaml.safe_load(tpl)
     for k in ['metadata','spatial','identification','distribution']:
         if not k in exp.keys():
             exp[k] = {}
+    
+    exp['identification']['title'] = dct.get('name',dct.get('title',fname))
+    exp['metadata']['identifier'] = dct.get('identifier',safeFileName(exp['identification']['title']))
+    exp['identification']['abstract'] = dct.get('description','')
 
-    exp['metadata']['identifier'] = dct.get('identifier',dct.get('name',''))
-    exp['metadata']['datestamp'] = datetime.date.today()
+    exp['metadata']['datestamp'] = dct.get('modified', datetime.date.today())      
+    for c in dct.get('creator','').split(';'):
+        if '@' in c:
+            exp['contact'][safeFileName(c)] = {'email': c, 'role':'creator'}
+        else:
+            exp['contact'][safeFileName(c)] = {'individualname': c, 'role':'creator'}
+    exp['identification']['keywords'] = {'default': {'keywords': (dct.get('keywords','').split(',') + dct.get('subject','').split(',') + dct.get('category','').split(','))}}
     exp['spatial']['datatype'] = dct.get('datatype','')
     exp['spatial']['geomtype'] = dct.get('geomtype','')
-    exp['identification']['title'] = dct.get('name','')
+    exp['identification']['status'] = dct.get('contentStatus','' )
+    exp['identification']['language'] = dct.get('language','')
     exp['identification']['dates'] = { 'creation': dct.get('date',datetime.date.today()) }
     if 'extents' not in exp['identification'].keys():
         exp['identification']['extents'] = {}

@@ -376,13 +376,13 @@
       <gmd:scope>
         <gmd:DQ_Scope>
           <gmd:level>
-            <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['dataquality']['scope']['level'] or 'dataset' }}">{{ record['dataquality']['scope']['level'] }}</gmd:MD_ScopeCode>
+            <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('dataquality',{}).get('scope',{}).get('level') or 'dataset' }}">{{ record.get('dataquality',{}).get('scope',{}).get('level') }}</gmd:MD_ScopeCode>
           </gmd:level>
         </gmd:DQ_Scope>
       </gmd:scope>
       <gmd:lineage>
         <gmd:LI_Lineage>
-          {{ cs.get_freetext('statement', record.get('metadata',{}).get('language_alternate'), get_charstring(record['dataquality']['lineage'].get('statement'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
+          {{ cs.get_freetext('statement', record.get('metadata',{}).get('language_alternate'), get_charstring(record.get('dataquality',{}).get('lineage',{}).get('statement'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
         </gmd:LI_Lineage>
       </gmd:lineage>
     </gmd:DQ_DataQuality>

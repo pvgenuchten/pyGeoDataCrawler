@@ -2,22 +2,19 @@
 
 from importlib.resources import path
 from copy import deepcopy
+from decimal import *
 import mappyfile, click, yaml
-import os, time, sys, re
+import os, time, sys, re, math
 import pprint
 import urllib.request
-from geodatacrawler.utils import indexSpatialFile, dict_merge
+from geodatacrawler.utils import indexFile, dict_merge
 from geodatacrawler.metadata import load_default_metadata, merge_folder_metadata
+from geodatacrawler import GDCCONFIG
 from yaml.loader import SafeLoader
 import importlib.resources as pkg_resources
 from urllib.parse import urlparse
 from . import templates
 from pathlib import Path
-
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg']
-ATTRIBUTE_FILE_TYPES = ['csv', 'xls']
-SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 
 @click.command()
 @click.option('--dir', nargs=1, type=click.Path(exists=True),
@@ -50,6 +47,7 @@ def mapForDir(dir, dir_out, dir_out_mode, recursive):
     config['msUrl'] = os.getenv('pgdc_ms_url') or ''
     config['webdavUrl'] = os.getenv('pgdc_webdav_url') or ''
     config['mdLinkTypes'] = os.getenv('pgdc_md_link_types') or ['OGC:WMS','OGC:WFS','OGC:WCS']
+    config['gridColors'] = "#56a1b3,#80bfab,#abdda4,#c7e8ad,#e3f4b6,#ffffbf,#fee4a0,#fec980,#fdae61,#f07c4a,#e44b33,#d7191c"
 
     initialMetadata['robot'] = config
 
@@ -153,9 +151,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 if not v.get('type','').startswith('OGC:') and os.path.exists(sf):
                                     print('processing file' + sf)
                                     fb,e = str(fn).rsplit('.', 1)
-                                    if e and e.lower() in SPATIAL_FILE_TYPES:
+                                    if e and e.lower() in GDCCONFIG["SPATIAL_FILE_TYPES"]:
                                     # we better index the file again... to get band info etc
-                                        fileinfo = indexSpatialFile(sf, e)
+                                        fileinfo = indexFile(sf, e)
 
                                         if (fileinfo.get('datatype','').lower() == "raster"):
                                             fileinfo['type'] = 'raster'
@@ -184,7 +182,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                         if style_reference=='':
                                             if fileinfo['type']=='raster': # set colors for range
                                                 band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0];
-                                                new_class_string2 = colorCoding(band1.get('min',0), band1.get('max',0))
+                                                new_class_string2 = colorCoding(band1.get('min',0), band1.get('max',0),config['gridColors'].split(','))
                                                 # fetch nodata from meta in file properties
                                                 new_class_string2 = 'PROCESSING "NODATA=' + str(
                                                     fileinfo.get('meta', {}).get('nodata', -32768)) + '"\n' + new_class_string2
@@ -243,7 +241,6 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
     # print(mappyfile.dumps(mf))
     # write to parent folder as {folder}.map
     if len(lyrs) > 0: # do not create mapfile if no layers
-        
         do = os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''))
         mapfile =  os.path.join(do,mf['name'] + ".map")
         
@@ -256,7 +253,8 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
         mappyfile.save(mf, mapfile, 
             indent=4, spacer=' ', quote='"', newlinechar='\n',
             end_comment=False, align_values=False)
-
+    else:
+        print('Map empty, skip creation')
 
 '''
 Verify if this metadata already has a link to this service
@@ -292,15 +290,18 @@ def addLink(type, layer, file, relPath, map, config):
 '''
 sets a color coding for a layer
 '''
-def colorCoding(min,max):
-    rng = max - min
+def colorCoding(min,max,colors):
+    getcontext().prec = 4 # set precision of decimals, so classes are not too specific
+    rng = Decimal(max - min)
     if rng > 0:
-        sgmt = rng/8
-        cur = min
+        sgmt =  Decimal(rng/len(colors))
+        cur =  Decimal(min)
         clsstr = ""
-        for clr in ["'#fcfdbf'","'#fec085'","'#fa825f'","'#e14d67'","'#ae347c'","'#782282'","'#440f76'","'#150e37'"]:
-            clsstr += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR {2}\nEND\nEND\n\n".format(cur,cur+sgmt,clr)
+        for clr in colors:
+            clsstr += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR '{2}'\nEND\nEND\n\n".format(cur,(cur+sgmt),clr)
             cur += sgmt
         return clsstr
     else:
         return ""
+
+

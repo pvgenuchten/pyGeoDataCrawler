@@ -5,6 +5,7 @@ import sys
 import pprint
 import urllib.request
 from copy import deepcopy
+from pwd import getpwuid
 import fiona
 from pyproj import CRS
 from osgeo import gdal, osr
@@ -14,21 +15,14 @@ from owslib.etree import etree
 import json
 import requests as req
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
-
-from pprint import pprint
-
-INDEX_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc', 'vrt']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'gpkg']
-SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
+from geodatacrawler import GDCCONFIG
 
 fiona.supported_drivers["OGR_VRT"] = "r"
 
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
 
-
-def indexSpatialFile(fname, extension):
+def indexFile(fname, extension):
 
     # check if a .xml file exists, to use as title/abstract etc
 
@@ -38,17 +32,20 @@ def indexSpatialFile(fname, extension):
         content = {
             'title': os.path.splitext(os.path.basename(fname))[0],
             'url': fname,
-            'date': time.ctime(os.path.getmtime(fname))
+            'date': time.ctime(os.path.getmtime(fname)),
+            'creator': getpwuid(os.stat(fname).st_uid).pw_name,
+            'size': os.stat(fname).st_size
         }
     except Exception as e:
-        print("Error set file",fname,e)
-        return
+        print("Error initial set file",fname,e)
+        content = {}
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
 
+    print(extension)
     # get spatial properties
-    if extension in GRID_FILE_TYPES:
-
+    if extension.lower() in GDCCONFIG["GRID_FILE_TYPES"]:
+        print(f"file {fname} indexed as GRID_FILE_TYPE")
         d = gdal.Open( fname )
  
         content['datatype'] = 'raster'
@@ -74,7 +71,7 @@ def indexSpatialFile(fname, extension):
         
         content['bounds'] = [ulx, lry, lrx, uly]
         content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
-        
+
         #which crs
         epsg = wkt2epsg(d.GetProjection())
         content['crs'] = epsg
@@ -96,7 +93,8 @@ def indexSpatialFile(fname, extension):
     
         d = None
 
-    elif extension in VECTOR_FILE_TYPES:
+    elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
+        print(f"file {fname} indexed as VECTOR_FILE_TYPE")
         with fiona.open(fname, "r") as source:
             content['datatype'] = "vector"
             try:
@@ -131,6 +129,13 @@ def indexSpatialFile(fname, extension):
         # else
         # create iso
 
+    elif (extension.lower() in ['xlsm', 'xlsx', 'xltx', 'xltm']):
+        print(f"file {fname} indexed as Excel")
+        md = parseExcel(fname)
+        if md:
+            return md
+    else:
+        print(f"file {fname} indexed as other type")
     return (content)
 
 # from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
@@ -197,6 +202,7 @@ def reprojectBounds(bnds,src,trg):
         target = osr.SpatialReference()
         target.ImportFromEPSG(trg)
         try:
+            target.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
             transform = osr.CoordinateTransformation(source, target)
             lr = transform.TransformPoint(bnds[0],bnds[1])
             ul = transform.TransformPoint(bnds[2],bnds[3])
@@ -310,6 +316,24 @@ def checkOWSLayer(url, protocol, name, identifier, title):
     
     return None
 
+def parseExcel(file):
+    from openpyxl import load_workbook
+    try:
+        wb = load_workbook(file)
+        return wb.properties.__dict__
+    except Exception as e:
+        print(f"Failed to read {file} as Excel; {str(e)}")
+        return None
+
+def parseExcelTraditional(file):
+    import xlrd
+    try:
+        book = xlrd.open_workbook(file)
+        print(book.__dict__)
+        return book.__dict__
+    except Exception as e:
+        print(f"Failed to read {file} as Spreadsheet; {str(e)}")
+        return None
 
 def prepCapabsResponse(CoreMD,lyrs):
     ''' prepares owslib-layers before being returned, returns only unique layers '''
@@ -437,6 +461,10 @@ def parseDataCite(strJSON,u):
         md['identification']['dates']['publication'] = str(attrs['publicationYear'])
     for v in attrs.get('rightsList',[]):
         md['identification']['rights'] = v.get('rightsURI',v.get('rightsIdentifier',''))
+    for kw in attrs.get('subjects',[]):
+        if 'keywords' not in md['identification']:
+            md['identification']['keywords'] = {}
+        md['identification']['keywords']['default'] = { 'keywords': kw }
     if attrs.get('types'):
         md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset')
         if attrs.get('types'):
