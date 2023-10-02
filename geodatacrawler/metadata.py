@@ -86,7 +86,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve
     initialMetadata = load_default_metadata(mode)
 
     if mode=='import-csv':
-        importCsv(dir, dir_out, map, sep, cluster)
+        importCsv(dir, dir_out, map, sep, cluster, prefix)
     else:
         processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir, resolve, prefix)
 
@@ -132,12 +132,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                             with open(fname, mode="r", encoding="utf-8") as f:
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 # make sure a identifier exists in metadata element
-                                if not cnf:
-                                    cnf = { 'metadata':{ 'identifier': prefix+fn } }
-                                elif 'metadata' not in cnf or cnf['metadata'] is None: 
-                                    cnf['metadata'] = { 'identifier': prefix+fn }
-                                elif 'identifier' not in cnf['metadata'] or cnf['metadata']['identifier'] in [None,""]:
-                                    cnf['metadata']['identifier'] =  prefix+fn
+                                checkId(cnf,fn,prefix)
                                 target = deepcopy(coreMetadata) # parent metadata
                                 dict_merge(target,cnf)
                                 # in many cases keywords are kept as array, not in the default thesaurus
@@ -354,11 +349,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         # mode init for spatial files without metadata or update
                         cnt = indexFile(fname, extension) 
                         md = asPGM(cnt,fname)
-                    
-                        if 'metadata' not in md or md['metadata'] is None:
-                            md['metadata'] = {}
-                        if 'identifier' not in md['metadata'] or md['metadata']['identifier'] in [None,'']:
-                            md['metadata']['identifier'] = str(os.path.join(relPath,fn)).replace(os.sep,'-')
+                        checkId(md,str(os.path.join(relPath,fn)).replace(os.sep,'-'),prefix)
                         if 'identification' not in md or md['identification'] is None:
                             md['identification'] = {}
                         if 'title' not in md['identification'] or md['identification']['title'] in [None,'']:
@@ -390,7 +381,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 # print('Skipping {}, no extension'.format(fname))
 
 
-def importCsv(dir,dir_out,map,sep,cluster):
+def importCsv(dir,dir_out,map,sep,cluster,prefix):
     if sep in [None,'']:
         sep = ','
     for file in Path(dir).iterdir():
@@ -439,23 +430,8 @@ def importCsv(dir,dir_out,map,sep,cluster):
                         print('folder',fldr,'created')
                     # which id to use
                     # check identifier
-                    if not 'metadata' in yMcf:
-                        yMcf['metadata'] = {}
-                    myid = yMcf['metadata'].get('identifier')
-                    if myid in [None,'']:
-                        myid = str(uuid.uuid1());
-                        # prepend cluster in id
-                        # if cluster not in [None,""] and cluster in md.keys():
-                        #    myid = md[cluster] + '-' + myid
-                        yMcf['metadata']['identifier'] = myid
-                    elif myid.startswith('http') or myid.startswith('ftp'):
-                        myid = myid.split('://')[1].split('?')[0]
-                        domains = ["drive.google.com/file/d","doi.org","data.europa.eu","researchgate.net/publication","handle.net","osf.io","library.wur.nl","freegisdata.org/record"]
-                        for d in domains:
-                            myid = myid.split(d+'/')[-1]
-
-                    myid = safeFileName(myid)
-                    yMcf['metadata']['identifier'] = myid
+                    checkId(yMcf,'',prefix)
+                    myid = yMcf['metadata']['identifier']
 
                     # write out the yml
                     print("Save to file",os.path.join(fldr,myid+'.yml'))
@@ -491,6 +467,21 @@ def insert_or_update(content, db, dbtype):
 
     return True
     # elif index = postgis
+
+def checkId(md, fn, prefix):
+    if md.get('metadata',{}).get('identifier','') == '': 
+        if md.get('metadata',{}).get('dataseturi','') != '': 
+            myuuid = md.get('metadata',{}).get('dataseturi','').split("://").pop()
+            domains = ["drive.google.com/file/d","doi.org","data.europa.eu","researchgate.net/publication","handle.net","osf.io","library.wur.nl","freegisdata.org/record"]
+            for d in domains:
+                myuuid = myuuid.split(d+'/')[-1]
+        elif fn not in [None,'']: 
+           myuuid = prefix + fn
+        else:
+           myuuid = prefix + str(uuid.uuid1());
+        if md['metadata'] in [None,'']:
+           md['metadata'] = {}
+        md['metadata']['identifier'] = safeFileName(myuuid)
 
 # format a index dict as pygeometa
 def asPGM(dct,fname):
