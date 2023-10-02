@@ -457,7 +457,7 @@ def parseDataCite(strJSON,u):
     }
     for v in attrs.get('dates',[]):
         md['identification']['dates'][v.get('dateType','creation').lower()] = v.get('date','')
-    if attrs['publicationYear']:
+    if attrs.get('publicationYear'):
         md['identification']['dates']['publication'] = str(attrs['publicationYear'])
     for v in attrs.get('rightsList',[]):
         md['identification']['rights'] = v.get('rightsURI',v.get('rightsIdentifier',''))
@@ -466,7 +466,7 @@ def parseDataCite(strJSON,u):
             md['identification']['keywords'] = {}
         md['identification']['keywords']['default'] = { 'keywords': kw }
     if attrs.get('types'):
-        md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset')
+        md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset').lower()
         if attrs.get('types'):
             md['spatial'] = {"type":attrs.get('types').get('resourceType','')}
     return md

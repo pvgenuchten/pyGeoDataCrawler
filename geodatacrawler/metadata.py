@@ -39,15 +39,21 @@ schemaPath = os.getenv('pgdc_schema_path') or os.path.join(os.path.dirname(__fil
 @click.option('--profile', nargs=1, required=False, help="export to profile iso19139 [dcat]")   
 @click.option('--db', nargs=1, required=False, help="a db to export to")           
 @click.option('--map', nargs=1, required=False, help="a mappingfile for csv")
+@click.option('--resolve', nargs=1, required=False, help="Resolve remote URI's to fetch remote metadata, default:False")
+@click.option('--prefix', nargs=1, required=False, help="Use prefix, when creating record ID")
 @click.option('--sep', nargs=1, required=False, help="which separator is used on csv, default:,")
 @click.option('--cluster', nargs=1, required=False, help="Use a field to cluster records in a folder, default:none")
-def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cluster):
+def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve, prefix, sep, cluster):
     if not dir:
         dir = "./"
     if dir[-1] == os.sep:
         dir = dir[:-1]
     if not dir_out:
         dir_out = dir
+    if not resolve:
+        resolve = False
+    if not prefix:
+        prefix = ""
     elif dir_out[-1] == os.sep:
         dir_out = dir_out[:-1]
     if not dir_out_mode or dir_out_mode not in ["flat","nested"]:
@@ -82,9 +88,9 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, sep, cl
     if mode=='import-csv':
         importCsv(dir, dir_out, map, sep, cluster)
     else:
-        processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir)
+        processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir, resolve, prefix)
 
-def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode, root):
+def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode, root, resolve, prefix):
     
     coreMetadata = merge_folder_metadata(parentMetadata, target_path, mode) 
 
@@ -102,7 +108,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 print('Skip path: '+ str(file))
             else:
                 print('Process path: '+ str(file))
-                processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root)
+                processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root, resolve, prefix)
         else:
             # process the file
             fname = str(file)
@@ -127,11 +133,11 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 cnf = yaml.load(f, Loader=SafeLoader)
                                 # make sure a identifier exists in metadata element
                                 if not cnf:
-                                    cnf = { 'metadata':{ 'identifier': fn } }
+                                    cnf = { 'metadata':{ 'identifier': prefix+fn } }
                                 elif 'metadata' not in cnf or cnf['metadata'] is None: 
-                                    cnf['metadata'] = { 'identifier': fn }
+                                    cnf['metadata'] = { 'identifier': prefix+fn }
                                 elif 'identifier' not in cnf['metadata'] or cnf['metadata']['identifier'] in [None,""]:
-                                    cnf['metadata']['identifier'] = fn
+                                    cnf['metadata']['identifier'] =  prefix+fn
                                 target = deepcopy(coreMetadata) # parent metadata
                                 dict_merge(target,cnf)
                                 # in many cases keywords are kept as array, not in the default thesaurus
@@ -172,21 +178,41 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         except Exception as e:
                             print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e,traceback.format_exc())
                     elif mode=='update':
+                        print('klaar',fn)
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:
                             orig = yaml.load(f, Loader=SafeLoader)
                         # todo: if this fails, we give a warning, or initialise the file again??
                         if not orig:
                             orig = {}
-                        if 'distribution' not in orig or orig['distribution'] is None: # edge case, apparently this case is not catched with orig.get('distribution',{})
+                        if 'distribution' not in orig or orig['distribution'] is None: 
                             orig['distribution'] = {}
+                        # find the relevant related file (introduced by init)
+                        dataFN = orig.get('distribution').get('local',{}).get('url','').split('/').pop()
+                        if (os.path.exists(os.path.join(target_path,dataFN))):
+                            cnt = indexFile(os.path.join(target_path,dataFN), dataFN.split('.').pop()) 
+                            if 'metadata' not in orig or orig['metadata'] is None: 
+                                orig['metadata'] = {}
+                            orig['metadata'] = orig.get('metadata',{})
+                            orig['metadata']['datestamp'] = cnt.get('modified', datetime.date.today())  
+                            if 'identification' not in orig or orig['identification'] is None: 
+                                orig['identification'] = {}
+                            orig['identification']['extents'] = orig['identification'].get('extents',{})
+                            if 'bounds_wgs84' in cnt and cnt.get('bounds_wgs84') is not None:
+                                bnds = cnt.get('bounds_wgs84')
+                                crs = 4326
+                            else:
+                                bnds = cnt.get('bounds',[])
+                                crs = cnt.get('crs','4326')
+                            orig['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
+                            orig['content_info'] = cnt.get('content_info',{})
+                        
                         # evaluate if a file is attached, or is only a metadata (of a wms for example)
                         hasFile = None
 
-
                         skipOWS = False # not needed if this is fetched from remote
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
-                        if 'dataseturi' in orig['metadata'] and orig['metadata']['dataseturi'] is not None:
+                        if resolve and orig['metadata'].get('dataseturi','').startswith('http'):
                             for u in orig['metadata']['dataseturi'].split(';'):
                                 md = fetchMetadata(u)
                                 dict_merge(orig, md)
@@ -195,7 +221,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         # extract metadata from OWS
                         hasProcessed = []
                         skipFinalWrite = False
-                        if not skipOWS:
+                        if not skipOWS and resolve:
                             for d,v in orig.get('distribution',{}).items():
                                 if (v.get('url','') not in [None,""] 
                                     and (v.get('type','').upper().startswith('OGC:') 
@@ -285,7 +311,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                             else:
                                                 for k,md in myDatasets.items():
                                                     dict_merge(nw, md)
-                                                    targetFile = target_path+os.sep + safeFileName(md['metadata']['identifier']) + '.yml'
+                                                    targetFile = os.path.join(target_path, safeFileName(md['metadata']['identifier']) + '.yml')
                                                     try:
                                                         skipFinalWrite = True
                                                         with open(targetFile, 'w') as f:
@@ -316,7 +342,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 print('Failed to dump yaml:',e)
 
                 # mode==init
-                elif extension.lower() in GDCCONFIG["INDEX_FILE_TYPES"]:
+                elif extension.lower() in GDCCONFIG["INDEX_FILE_TYPES"] and fn != "index":
                     # print ('Indexing file ' + fname)
                     if (dir_out_mode=='flat'):
                         outBase = os.path.join(dir_out,fn)
