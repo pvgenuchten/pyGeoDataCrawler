@@ -58,17 +58,20 @@ def indexFile(fname, extension):
         lrx = ulx + (d.RasterXSize * xres)
         lry = uly + (d.RasterYSize * yres)
 
-        #get min-max, assume this is a single band gtiff
-        srcband = d.GetRasterBand(1)
-        if not srcband.GetMinimum():
-            srcband.ComputeStatistics(0)
-        mn=srcband.GetMinimum()
-        mx=srcband.GetMaximum()
-        ct = srcband.GetColorTable()
-        clrTable = []
-        if ct:
-            clrTable = {str(i): list(ct.GetColorEntry(i)) for i in range(ct.GetCount())}
-        
+        #get min-max per band
+        bands = []
+        for i in range(d.RasterCount):
+            srcband = d.GetRasterBand(i+1) # raster bands counts from 1
+            if not srcband.GetMinimum():
+                srcband.ComputeStatistics(0)
+            bands.append({
+                    "name": srcband.GetDescription(),
+                    "min": srcband.GetMaximum(),
+                    "max": srcband.GetMinimum(),
+                    "nodata": int(srcband.GetNoDataValue()),
+                    "units": str(srcband.GetUnitType())
+            })
+
         content['bounds'] = [ulx, lry, lrx, uly]
         content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
 
@@ -78,14 +81,7 @@ def indexFile(fname, extension):
 
         content['content_info'] = {
                 'type': 'image',
-                'dimensions': [{
-                    "resolution": xres,
-                    "min": mn,
-                    "max": mx,
-                    "width": int(d.RasterXSize),
-                    "height": int(d.RasterYSize),
-                    "colors": clrTable
-                }],
+                'dimensions': bands,
                 'meta':  d.GetMetadata()
             }
 
