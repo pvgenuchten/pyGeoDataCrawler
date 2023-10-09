@@ -173,10 +173,10 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         except Exception as e:
                             print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e,traceback.format_exc())
                     elif mode=='update':
-                        print('klaar',fn)
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:
                             orig = yaml.load(f, Loader=SafeLoader)
+                        print('Process record',str(file).split('.')[0])
                         # todo: if this fails, we give a warning, or initialise the file again??
                         if not orig:
                             orig = {}
@@ -184,7 +184,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                             orig['distribution'] = {}
                         # find the relevant related file (introduced by init)
                         dataFN = orig.get('distribution').get('local',{}).get('url','').split('/').pop()
-                        if (os.path.exists(os.path.join(target_path,dataFN))):
+                        if (dataFN not in [None,''] and os.path.exists(os.path.join(target_path,dataFN))):
                             cnt = indexFile(os.path.join(target_path,dataFN), dataFN.split('.').pop()) 
                             if 'metadata' not in orig or orig['metadata'] is None: 
                                 orig['metadata'] = {}
@@ -419,7 +419,6 @@ def importCsv(dir,dir_out,map,sep,cluster,prefix):
                 except Error as e:
                     print('Failed substituting',md,e)    
                 if yMcf:
-                    
                     # which folder to write to?
                     fldr = dir_out
                     if cluster not in [None,""] and cluster in md.keys():
@@ -469,7 +468,7 @@ def insert_or_update(content, db, dbtype):
     # elif index = postgis
 
 def checkId(md, fn, prefix):
-    if md.get('metadata',{}).get('identifier','') == '': 
+    if md.get('metadata',{}).get('identifier','') in [None,'']: 
         if md.get('metadata',{}).get('dataseturi','') != '': 
             myuuid = md.get('metadata',{}).get('dataseturi','').split("://").pop()
             domains = ["drive.google.com/file/d","doi.org","data.europa.eu","researchgate.net/publication","handle.net","osf.io","library.wur.nl","freegisdata.org/record"]

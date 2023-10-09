@@ -23,9 +23,7 @@ fiona.supported_drivers["OGR_VRT"] = "r"
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
 
 def indexFile(fname, extension):
-
-    # check if a .xml file exists, to use as title/abstract etc
-
+    # todo: check if a .xml file exists, to use as title/abstract etc
 
     # else extract metadata from file (or update metadata from file content)
     try:
@@ -41,8 +39,6 @@ def indexFile(fname, extension):
         content = {}
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
-
-    print(extension)
     # get spatial properties
     if extension.lower() in GDCCONFIG["GRID_FILE_TYPES"]:
         print(f"file {fname} indexed as GRID_FILE_TYPE")
@@ -407,7 +403,7 @@ def fetchMetadata(u):
 
     if 'doi.org' in u:
         try:
-            resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            resp = fetchUrl("https://api.datacite.org/dois/"+u.split('doi.org/')[1])
             if resp.status_code == 200:
                 md = parseDataCite(resp.text,u)  
                 return md
@@ -418,7 +414,7 @@ def fetchMetadata(u):
     else:
         # Try a generic request
         try:
-            resp = req.get(u, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            resp = fetchUrl(u)
             restype = resp.headers['Content-Type']
             md = {}
             if (restype == 'application/json'):
@@ -434,7 +430,7 @@ def fetchMetadata(u):
         except Exception as e:
                 print("Failed to fetch",u,str(e))    
 
-def parseDataCite(strJSON,u):
+def parseDataCite(strJSON, u):
     attrs = json.loads(strJSON)
     # some datacite embeds content in data.attributes
     if ('data' in attrs and 'attributes' in attrs['data']):
@@ -467,7 +463,7 @@ def parseDataCite(strJSON,u):
             md['spatial'] = {"type":attrs.get('types').get('resourceType','')}
     return md
 
-def parseISO(strXML):
+def parseISO(strXML, u):
     # check if a csw request
     if 'getrecordbyid' in u.lower():
         try:
@@ -542,6 +538,15 @@ def owsCapabilities2md (url, protocol):
         print(protocol,'not implemented')
     
     return lyrmd
+
+def fetchUrl(url):
+    try:
+        r = req.get(url, headers={'User-agent': 'Mozilla/5.0'}, timeout=5)
+        r.raise_for_status()
+        return r
+    except req.exceptions.SSLError as sslerr:
+        print('retry without cert validation',sslerr)
+        return req.get(url, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
 
 def safeFileName(n):
     ''' remove unsafe characters from a var to make it safe'''
