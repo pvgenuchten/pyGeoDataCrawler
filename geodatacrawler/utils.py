@@ -26,17 +26,13 @@ def indexFile(fname, extension):
     # todo: check if a .xml file exists, to use as title/abstract etc
 
     # else extract metadata from file (or update metadata from file content)
-    try:
-        content = {
-            'title': os.path.splitext(os.path.basename(fname))[0],
-            'url': fname,
-            'date': time.ctime(os.path.getmtime(fname)),
-            'creator': getpwuid(os.stat(fname).st_uid).pw_name,
-            'size': os.stat(fname).st_size
-        }
-    except Exception as e:
-        print("Error initial set file",fname,e)
-        content = {}
+    content = {
+        'title': os.path.splitext(os.path.basename(fname))[0],
+        'url': fname,
+        'date': getDate(fname),
+        'creator': getUser(fname),
+        'size': getSize(fname)
+    }
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
     # get spatial properties
@@ -64,8 +60,8 @@ def indexFile(fname, extension):
                     "name": srcband.GetDescription(),
                     "min": srcband.GetMaximum(),
                     "max": srcband.GetMinimum(),
-                    "nodata": int(srcband.GetNoDataValue()),
-                    "units": str(srcband.GetUnitType())
+                    "nodata": int(srcband.GetNoDataValue() or 0),
+                    "units": str(srcband.GetUnitType() or '')
             })
 
         content['bounds'] = [ulx, lry, lrx, uly]
@@ -462,6 +458,32 @@ def parseDataCite(strJSON, u):
         if attrs.get('types'):
             md['spatial'] = {"type":attrs.get('types').get('resourceType','')}
     return md
+
+def getSize(fname):
+    s = 0
+    try:
+        s = os.stat(fname).st_size
+    except Exception as e:
+        print("WARNING: Error getting size",fname,str(e)) 
+    return s
+
+def getDate(fname):
+    d='unknown'
+    try:
+        d= time.ctime(os.path.getmtime(fname))
+    except Exception as e:
+        print("WARNING: Error getting date",fname,str(e)) 
+    return d
+
+def getUser(fname):
+    u = 'unknown'
+    try:
+        u = os.stat(fname).st_uid
+        u = getpwuid(u).pw_name
+    except Exception as e:
+        print("WARNING: Error getting user",fname,str(e)) 
+    return u
+
 
 def parseISO(strXML, u):
     # check if a csw request

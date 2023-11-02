@@ -114,3 +114,11 @@ GDAL 3.3.2, released 2021/09/01
 >> pip install gdal==3.3.2
 >> exit
 ```
+
+### Release
+
+- update [__init__.py](__init__.py) and [pyporoject.toml](pyproject.toml)
+- push changes
+- trigger semantic release
+- poetry build
+- poetry publish

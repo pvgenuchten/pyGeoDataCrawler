@@ -291,17 +291,21 @@ def addLink(type, layer, file, relPath, map, config):
 sets a color coding for a layer
 '''
 def colorCoding(min,max,colors):
-    getcontext().prec = 4 # set precision of decimals, so classes are not too specific
-    rng = Decimal(max - min)
-    if rng > 0:
-        sgmt =  Decimal(rng/len(colors))
-        cur =  Decimal(min)
-        clsstr = ""
-        for clr in colors:
-            clsstr += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR '{2}'\nEND\nEND\n\n".format(cur,(cur+sgmt),clr)
-            cur += sgmt
-        return clsstr
-    else:
+    try: 
+        getcontext().prec = 4 # set precision of decimals, so classes are not too specific
+        rng = Decimal(max - min)
+        if rng > 0:
+            sgmt =  Decimal(rng/len(colors))
+            cur =  Decimal(min)
+            clsstr = ""
+            for clr in colors:
+                clsstr += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR '{2}'\nEND\nEND\n\n".format(cur,(cur+sgmt),clr)
+                cur += sgmt
+            return clsstr
+        else:
+            return ""
+    except Exception as e:
+        print('WARNING: Unable to assign colors to band range',str(e))
         return ""
 
 

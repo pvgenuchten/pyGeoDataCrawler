@@ -1,4 +1,4 @@
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 
 GDCCONFIG = {
 "TEXT_FILE_TYPES":  ['xlsm', 'xlsx', 'xltx', 'xltm', 'sqlite', 'db', 'csv'],
