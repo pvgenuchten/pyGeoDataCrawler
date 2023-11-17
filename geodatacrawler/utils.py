@@ -482,7 +482,7 @@ def getUser(fname):
         u = getpwuid(u).pw_name
     except Exception as e:
         print("WARNING: Error getting user",fname,str(e)) 
-    return u
+    return str(u)
 
 
 def parseISO(strXML, u):
