@@ -1,3 +1,32 @@
+## [1.1.4](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.3...1.1.4) (2023-08-25)
+
+
+### Bug Fixes
+
+* folder inheritence ([0dcb7dd](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/0dcb7ddfaec9c3c12be6ac8cec1c83f956a8e2f1))
+
+## [1.1.3](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.2...1.1.3) (2023-08-23)
+
+
+### Bug Fixes
+
+* optimize mapfiles generation, add skip-files/folders ([f83a0d3](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/f83a0d3d68a42d99b9b643d66c3f616aba160025))
+* update version nr ([86352b3](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/86352b3e7e7a3b5842a17d3467372054003d4fb1))
+
+## [1.1.2](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.1...1.1.2) (2023-08-01)
+
+
+### Bug Fixes
+
+* paths in metadata ([0192324](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/01923247ef5ce8fbd8561a5363827613bd3c1188))
+
+## [1.1.1](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.1.0...1.1.1) (2023-07-31)
+
+
+### Bug Fixes
+
+* update readme, downgrade pysqlite3, to facilitate conda ([26b66ac](https://git.wur.nl/isric/ict/pygeodatacrawler/commit/26b66ac678672080b7529cb9be80477a04c793a4))
+
 ## [1.1.0](https://git.wur.nl/isric/ict/pygeodatacrawler/compare/1.0.20...1.1.0) (2023-07-31)
 
 

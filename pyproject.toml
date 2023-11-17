@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "geodatacrawler"
-version = "1.1.1"
+version = "1.2.1"
 license = "MIT"
 description = "a crawler script to extract and author metadata of spatial datasets"
 authors = ["Paul van Genuchten <genuchten@yahoo.com>"]
@@ -26,9 +26,11 @@ pandas = "^1.5.1"
 Jinja2 = "^3.1.2"
 jinja2-time = "^0.2.0"
 bibtexparser = "^1.4.0"
+pytest = "^7.4.0"
+openpyxl = "^3.1.2"
 
 [tool.poetry.dev-dependencies]
-pytest = "^5.2"
+pytest = "^7.4.0"
 
 [tool.poetry.scripts]
 crawl-metadata = "geodatacrawler.metadata:indexDir"

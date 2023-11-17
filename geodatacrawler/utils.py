@@ -5,6 +5,7 @@ import sys
 import pprint
 import urllib.request
 from copy import deepcopy
+from pwd import getpwuid
 import fiona
 from pyproj import CRS
 from osgeo import gdal, osr
@@ -14,41 +15,29 @@ from owslib.etree import etree
 import json
 import requests as req
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
-
-from pprint import pprint
-
-INDEX_FILE_TYPES = ['xls', 'xlsx', 'geojson', 'sqlite', 'db', 'csv']
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg']
-SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
+from geodatacrawler import GDCCONFIG
 
 fiona.supported_drivers["OGR_VRT"] = "r"
 
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
 
-
-def indexSpatialFile(fname, extension):
-
-    # check if a .xml file exists, to use as title/abstract etc
-
+def indexFile(fname, extension):
+    # todo: check if a .xml file exists, to use as title/abstract etc
 
     # else extract metadata from file (or update metadata from file content)
-    try:
-        content = {
-            'title': os.path.splitext(os.path.basename(fname))[0],
-            'url': fname,
-            'date': time.ctime(os.path.getmtime(fname))
-        }
-    except Exception as e:
-        print("Error set file",fname,e)
-        return
+    content = {
+        'title': os.path.splitext(os.path.basename(fname))[0],
+        'url': fname,
+        'date': getDate(fname),
+        'creator': getUser(fname),
+        'size': getSize(fname)
+    }
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
-
     # get spatial properties
-    if extension in GRID_FILE_TYPES:
-
+    if extension.lower() in GDCCONFIG["GRID_FILE_TYPES"]:
+        print(f"file {fname} indexed as GRID_FILE_TYPE")
         d = gdal.Open( fname )
  
         content['datatype'] = 'raster'
@@ -61,34 +50,30 @@ def indexSpatialFile(fname, extension):
         lrx = ulx + (d.RasterXSize * xres)
         lry = uly + (d.RasterYSize * yres)
 
-        #get min-max, assume this is a single band gtiff
-        srcband = d.GetRasterBand(1)
-        if not srcband.GetMinimum():
-            srcband.ComputeStatistics(0)
-        mn=srcband.GetMinimum()
-        mx=srcband.GetMaximum()
-        ct = srcband.GetColorTable()
-        clrTable = []
-        if ct:
-            clrTable = {str(i): list(ct.GetColorEntry(i)) for i in range(ct.GetCount())}
-        
+        #get min-max per band
+        bands = []
+        for i in range(d.RasterCount):
+            srcband = d.GetRasterBand(i+1) # raster bands counts from 1
+            if not srcband.GetMinimum():
+                srcband.ComputeStatistics(0)
+            bands.append({
+                    "name": srcband.GetDescription(),
+                    "min": srcband.GetMaximum(),
+                    "max": srcband.GetMinimum(),
+                    "nodata": int(srcband.GetNoDataValue() or 0),
+                    "units": str(srcband.GetUnitType() or '')
+            })
+
         content['bounds'] = [ulx, lry, lrx, uly]
         content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
-        
+
         #which crs
         epsg = wkt2epsg(d.GetProjection())
         content['crs'] = epsg
 
         content['content_info'] = {
                 'type': 'image',
-                'dimensions': [{
-                    "resolution": xres,
-                    "min": mn,
-                    "max": mx,
-                    "width": int(d.RasterXSize),
-                    "height": int(d.RasterYSize),
-                    "colors": clrTable
-                }],
+                'dimensions': bands,
                 'meta':  d.GetMetadata()
             }
 
@@ -96,7 +81,8 @@ def indexSpatialFile(fname, extension):
     
         d = None
 
-    elif extension in VECTOR_FILE_TYPES:
+    elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
+        print(f"file {fname} indexed as VECTOR_FILE_TYPE")
         with fiona.open(fname, "r") as source:
             content['datatype'] = "vector"
             try:
@@ -131,6 +117,13 @@ def indexSpatialFile(fname, extension):
         # else
         # create iso
 
+    elif (extension.lower() in ['xlsm', 'xlsx', 'xltx', 'xltm']):
+        print(f"file {fname} indexed as Excel")
+        md = parseExcel(fname)
+        if md:
+            return md
+    else:
+        print(f"file {fname} indexed as other type")
     return (content)
 
 # from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
@@ -163,10 +156,12 @@ def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
         crs = CRS.from_wkt(wkt)
         epsg = crs.to_epsg()
     except Exception as e:
-        print('Invalid src (wkt) provided: ', e)
+        print('Invalid src (wkt) provided: ', e,'proj:', wkt)
     if not epsg:
-        if (wkt == 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'):
+        if ('GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]' in wkt):
             return "epsg:42106"
+        elif ('GEOGCS["GCS_WGS_1984_ellipse",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["Degree",0.0174532925199433]],PROJECTION["Interrupted_Goode_Homolosine"],PARAMETER["central_meridian",0],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]' in wkt):
+            return "epsg:54052"
         print('Unable to identify: ' + wkt)
     else:
         return "epsg:" + str(epsg) 
@@ -195,6 +190,7 @@ def reprojectBounds(bnds,src,trg):
         target = osr.SpatialReference()
         target.ImportFromEPSG(trg)
         try:
+            target.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
             transform = osr.CoordinateTransformation(source, target)
             lr = transform.TransformPoint(bnds[0],bnds[1])
             ul = transform.TransformPoint(bnds[2],bnds[3])
@@ -308,6 +304,24 @@ def checkOWSLayer(url, protocol, name, identifier, title):
     
     return None
 
+def parseExcel(file):
+    from openpyxl import load_workbook
+    try:
+        wb = load_workbook(file)
+        return wb.properties.__dict__
+    except Exception as e:
+        print(f"Failed to read {file} as Excel; {str(e)}")
+        return None
+
+def parseExcelTraditional(file):
+    import xlrd
+    try:
+        book = xlrd.open_workbook(file)
+        print(book.__dict__)
+        return book.__dict__
+    except Exception as e:
+        print(f"Failed to read {file} as Spreadsheet; {str(e)}")
+        return None
 
 def prepCapabsResponse(CoreMD,lyrs):
     ''' prepares owslib-layers before being returned, returns only unique layers '''
@@ -385,7 +399,7 @@ def fetchMetadata(u):
 
     if 'doi.org' in u:
         try:
-            resp = req.get("https://api.datacite.org/dois/"+u.split('doi.org/')[1], headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            resp = fetchUrl("https://api.datacite.org/dois/"+u.split('doi.org/')[1])
             if resp.status_code == 200:
                 md = parseDataCite(resp.text,u)  
                 return md
@@ -396,7 +410,7 @@ def fetchMetadata(u):
     else:
         # Try a generic request
         try:
-            resp = req.get(u, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+            resp = fetchUrl(u)
             restype = resp.headers['Content-Type']
             md = {}
             if (restype == 'application/json'):
@@ -412,7 +426,7 @@ def fetchMetadata(u):
         except Exception as e:
                 print("Failed to fetch",u,str(e))    
 
-def parseDataCite(strJSON,u):
+def parseDataCite(strJSON, u):
     attrs = json.loads(strJSON)
     # some datacite embeds content in data.attributes
     if ('data' in attrs and 'attributes' in attrs['data']):
@@ -431,17 +445,47 @@ def parseDataCite(strJSON,u):
     }
     for v in attrs.get('dates',[]):
         md['identification']['dates'][v.get('dateType','creation').lower()] = v.get('date','')
-    if attrs['publicationYear']:
+    if attrs.get('publicationYear'):
         md['identification']['dates']['publication'] = str(attrs['publicationYear'])
     for v in attrs.get('rightsList',[]):
         md['identification']['rights'] = v.get('rightsURI',v.get('rightsIdentifier',''))
+    for kw in attrs.get('subjects',[]):
+        if 'keywords' not in md['identification']:
+            md['identification']['keywords'] = {}
+        md['identification']['keywords']['default'] = { 'keywords': kw }
     if attrs.get('types'):
-        md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset')
+        md['metadata']['hierarchylevel'] = attrs.get('types').get('resourceTypeGeneral','dataset').lower()
         if attrs.get('types'):
             md['spatial'] = {"type":attrs.get('types').get('resourceType','')}
     return md
 
-def parseISO(strXML):
+def getSize(fname):
+    s = 0
+    try:
+        s = os.stat(fname).st_size
+    except Exception as e:
+        print("WARNING: Error getting size",fname,str(e)) 
+    return s
+
+def getDate(fname):
+    d='unknown'
+    try:
+        d= time.ctime(os.path.getmtime(fname))
+    except Exception as e:
+        print("WARNING: Error getting date",fname,str(e)) 
+    return d
+
+def getUser(fname):
+    u = 'unknown'
+    try:
+        u = os.stat(fname).st_uid
+        u = getpwuid(u).pw_name
+    except Exception as e:
+        print("WARNING: Error getting user",fname,str(e)) 
+    return u
+
+
+def parseISO(strXML, u):
     # check if a csw request
     if 'getrecordbyid' in u.lower():
         try:
@@ -516,6 +560,15 @@ def owsCapabilities2md (url, protocol):
         print(protocol,'not implemented')
     
     return lyrmd
+
+def fetchUrl(url):
+    try:
+        r = req.get(url, headers={'User-agent': 'Mozilla/5.0'}, timeout=5)
+        r.raise_for_status()
+        return r
+    except req.exceptions.SSLError as sslerr:
+        print('retry without cert validation',sslerr)
+        return req.get(url, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
 
 def safeFileName(n):
     ''' remove unsafe characters from a var to make it safe'''

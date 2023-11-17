@@ -7,4 +7,4 @@ def test_aspgm():
         'geomtype': 'raster',
     })
     assert foo['mcf']['version'] == 1.0
-    assert foo['identification']['title']['en'] == 'faa'
+    assert foo['identification']['title'] == 'faa'

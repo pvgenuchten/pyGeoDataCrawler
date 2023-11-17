@@ -5,12 +5,11 @@ MAP
     SIZE 800 800
     UNITS meters
     MAXSIZE 16384
-    EXTENT -19949000.0 -6147500.0 19861750.0 8361000.0
+    EXTENT -180 -90 180 90
     PROJECTION
-        'init=epsg:152160'
+        'init=epsg:4326'
     END #PROJECTION
     IMAGECOLOR 255 255 255 
-    IMAGEQUALITY 80
     IMAGETYPE AGGA
     
     OUTPUTFORMAT
@@ -59,29 +58,33 @@ MAP
         TEMPPATH '/tmp/'
         METADATA
             'ows_title'           ''
-            'ows_srs'             'EPSG:152160 EPSG:4326 EPSG:3857 EPSG:54009 EPSG:54012'
+            'ows_srs'             'EPSG:4326 EPSG:3857 EPSG:54009 EPSG:54012'
             'ows_abstract'        ''
-            'ows_keywordlist'     ''     
-            'wms_feature_info_mime_type' 'text/html'     
+            'ows_keywordlist'     ''
             'ows_enable_request'   '*'
             'ows_getlegendgraphic_formatlist' 'image/png,image/svg+xml'
             'ows_description'        ''
             'ows_addresstype'          'postal'
-            'ows_address'              'Droevendaalsesteeg 3, 6708 PB'
-            'ows_city'                 'Wageningen'
-            'ows_stateorprovince'      'Gelderland'
-            'ows_postcode'             '6708PB'
-            'ows_country'              'The Netherlands'
-            'ows_contactelectronicmailaddress' 'soilgrids@isric.org'
-            'ows_contactperson'            'Soilgrids'
-            'ows_contactorganization'      'ISRIC - World Soil Reference'
-            'ows_contactposition'         'SDI manager'
-            'ows_hoursofservice'    '9AM to 5PM CET'
-            'ows_contactinstructions' 'Contact by email'
-            'ows_role'              'SDI manager'
+            'ows_address'              ''
+            'ows_city'                 ''
+            'ows_stateorprovince'      ''
+            'ows_postcode'             ''
+            'ows_country'              ''
+            'ows_contactelectronicmailaddress' ''
+            'ows_contactperson'            ''
+            'ows_contactorganization'      ''
+            'ows_contactposition'         ''
+            'ows_hoursofservice'    ''
+            'ows_contactinstructions' ''
+            'ows_role'              ''
             'ows_fees'              'None'
             'ows_accessconstraints' 'None'
-            
+            'ows_onlineresource'    'http://localhost/example'
+            'oga_onlineresource'    'http://localhost/example/ogcapi'
+            'oga_enable_request'        '*'  
+            'wms_allow_getmap_without_styles' 'true'
+            'wms_rootlayer_name' ''
+            'wms_feature_info_mime_type' 'text/html' 
         END
     END # WEB
 
@@ -90,7 +93,7 @@ MAP
         TYPE RASTER
         DATA 'foo'
         PROJECTION
-            "init=epsg4326"
+            "init=epsg:4326"
         END
         STATUS on
     END

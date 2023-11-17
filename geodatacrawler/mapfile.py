@@ -2,22 +2,19 @@
 
 from importlib.resources import path
 from copy import deepcopy
+from decimal import *
 import mappyfile, click, yaml
-import os, time, sys
+import os, time, sys, re, math
 import pprint
 import urllib.request
-from geodatacrawler.utils import indexSpatialFile, dict_merge
+from geodatacrawler.utils import indexFile, dict_merge
 from geodatacrawler.metadata import load_default_metadata, merge_folder_metadata
+from geodatacrawler import GDCCONFIG
 from yaml.loader import SafeLoader
 import importlib.resources as pkg_resources
 from urllib.parse import urlparse
 from . import templates
 from pathlib import Path
-
-GRID_FILE_TYPES = ['tif', 'grib2', 'nc']
-VECTOR_FILE_TYPES = ['shp', 'mvt', 'dxf', 'dwg', 'fgdb', 'gml', 'kml', 'geojson', 'vrt', 'gpkg']
-ATTRIBUTE_FILE_TYPES = ['csv', 'xls']
-SPATIAL_FILE_TYPES = GRID_FILE_TYPES + VECTOR_FILE_TYPES
 
 @click.command()
 @click.option('--dir', nargs=1, type=click.Path(exists=True),
@@ -45,24 +42,28 @@ def mapForDir(dir, dir_out, dir_out_mode, recursive):
     # initial config (from program folder)
     config = initialMetadata.get('robot',{})
     config['rootDir'] = dir   
-    config['outDir'] = os.getenv('pgdc_out_dir') or dir_out
-    config['mdUrlPattern'] = os.getenv('pgdc_md_url') or 'http://example.com/{0}'
-    config['msUrl'] = os.getenv('pgdc_ms_url') or 'http://example.com/'
-    config['webdavUrl'] = os.getenv('pgdc_webdav_url') or 'http://example.com/'
+    config['outDir'] = os.getenv('pgdc_dir_out') or dir_out
+    config['mdUrlPattern'] = os.getenv('pgdc_md_url') or ''
+    config['msUrl'] = os.getenv('pgdc_ms_url') or ''
+    config['webdavUrl'] = os.getenv('pgdc_webdav_url') or ''
     config['mdLinkTypes'] = os.getenv('pgdc_md_link_types') or ['OGC:WMS','OGC:WFS','OGC:WCS']
+    config['gridColors'] = "#56a1b3,#80bfab,#abdda4,#c7e8ad,#e3f4b6,#ffffbf,#fee4a0,#fec980,#fdae61,#f07c4a,#e44b33,#d7191c"
 
-    processPath("", initialMetadata, dir_out, dir_out_mode, recursive, config)
+    initialMetadata['robot'] = config
 
-def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, config):
-    
-    
+    processPath("", initialMetadata, dir_out, dir_out_mode, recursive)
+
+def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
+
+    parentConfig = parentMetadata.get('robot',{})    
     # merge folder metadata
-    coreMetadata = merge_folder_metadata(parentMetadata, config['rootDir']+relPath, "update")
+    coreMetadata = merge_folder_metadata(parentMetadata, os.path.join(parentConfig['rootDir'],relPath), "update")
   
-    cnf2 = coreMetadata.get('robot',{})
-    dict_merge(config, cnf2)
-    
-    print(config)
+    config = coreMetadata.get('robot',{})
+
+    skipSubfolders = False
+    if 'skip-subfolders' in config:
+        skipSubfolders = config['skip-subfolders']
 
     # initalise folder mapfile
     tpl = pkg_resources.open_text(templates, 'default.map')
@@ -106,16 +107,23 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
         mf["web"]["metadata"]["ows_attribution_onlineresource"] = first.get("url","")
     mf["web"]["metadata"]["ows_fees"] = coreMetadata.get('identification').get("fees","")
     mf["web"]["metadata"]["ows_accessconstraints"] = coreMetadata.get('identification').get("accessconstraints","") 
+    mf["web"]["metadata"]["ows_onlineresource"] = config['msUrl'] + '/' + mf["name"]
+    mf["web"]["metadata"]["oga_onlineresource"] = mf["web"]["metadata"]["ows_onlineresource"] + '/ogcapi'
 
-    for file in Path(config['rootDir']+relPath).iterdir():
+    for file in Path(os.path.join(config['rootDir'],relPath)).iterdir():
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and recursive and not fname.startswith('.'):
-            # go one level deeper
-            print('process path: '+ str(file))
-            processPath(relPath+os.sep+fname, deepcopy(coreMetadata), dir_out, dir_out_mode, recursive, deepcopy(config))
+            if skipSubfolders:
+                print('Skip path: '+ str(file))
+            else:
+                # go one level deeper
+                print('Process path: '+ str(file))
+                processPath(os.path.join(relPath,fname), deepcopy(coreMetadata), dir_out, dir_out_mode, recursive)
         else:
+            if 'skip-files' in config and config['skip-files'] != '' and re.search(config['skip-files'], fname):
+                print('Skip file',fname)
             # process the file
-            if '.' in str(file):
+            elif '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split(os.sep).pop()
                 # do we trigger on ymls only, or also on spatial files? to go back to the file from the yml works via distribution(s)?
@@ -133,19 +141,19 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
                             ly = cnt.get('robot',{}).get('map',{})
 
                             # prepare layer(s)
-                            print('found ',len(cnt.get('distribution',{}).items()), 'files in ',fname)
+                            # print('Found',len(cnt.get('distribution',{}).items()),'existing disributions in',fname)
 
                             for d,v in cnt.get('distribution',{}).items():
                                 # for each link check if local file exists
                                 parsed = urlparse(v.get('url',''))
                                 fn = str(parsed.path).split('/').pop()
-                                sf = config['rootDir'] + relPath + os.sep + fn
+                                sf = os.path.join(config['rootDir'], relPath , fn)
                                 if not v.get('type','').startswith('OGC:') and os.path.exists(sf):
                                     print('processing file' + sf)
-                                    b,e = str(fn).rsplit('.', 1)
-                                    if e.lower() in SPATIAL_FILE_TYPES:
+                                    fb,e = str(fn).rsplit('.', 1)
+                                    if e and e.lower() in GDCCONFIG["SPATIAL_FILE_TYPES"]:
                                     # we better index the file again... to get band info etc
-                                        fileinfo = indexSpatialFile(sf, e)
+                                        fileinfo = indexFile(sf, e)
 
                                         if (fileinfo.get('datatype','').lower() == "raster"):
                                             fileinfo['type'] = 'raster'
@@ -174,14 +182,14 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
                                         if style_reference=='':
                                             if fileinfo['type']=='raster': # set colors for range
                                                 band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0];
-                                                new_class_string2 = colorCoding(band1.get('min',0), band1.get('max',0))
+                                                new_class_string2 = colorCoding(band1.get('min',0), band1.get('max',0),config['gridColors'].split(','))
                                                 # fetch nodata from meta in file properties
                                                 new_class_string2 = 'PROCESSING "NODATA=' + str(
                                                     fileinfo.get('meta', {}).get('nodata', -32768)) + '"\n' + new_class_string2
                                             else: # vector
                                                 new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
                                         else: 
-                                            stylefile = config['rootDir']+relPath+os.sep+style_reference
+                                            stylefile = os.path.join(config['rootDir'],relPath,style_reference)
                                             if os.path.exists(stylefile):
                                                 with open(stylefile) as f1:
                                                     new_class_string2 = f1.read()
@@ -192,41 +200,40 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
                                                 
                                         new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
 
-                                        strLr = new_layer_string.format(name=b,
-                                                    owsurl=config['msUrl']+'/'+relPath,
+                                        strLr = new_layer_string.format(name=fb,
                                                     title='"'+cnt.get('identification',{}).get('title', '')+'"',
                                                     abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
                                                     type=fileinfo['type'],
-                                                    path=relPath.split(os.sep).pop()+os.sep+fn, # map is in parent
+                                                    path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
                                                     template=ly.get('template', 'info.html'),
                                                     projection=fileinfo['crs'],
                                                     projections=ly.get('projections', 'epsg:4326 epsg:3857'),
                                                     extent=" ".join(map(str,fileinfo['bounds'])),
-                                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',b)), # or use the externalid here (doi)
+                                                    id="fid", # todo, use field from attributes, config?
+                                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
                                                     classes=new_class_string2)
                                         #except Exception as e:
                                         #    print("Failed creation of layer {0}; {1}".format(cnt['name'], e))
                                             
-                                        #try:
-                                        mslr = mappyfile.loads(strLr)
+                                        try:
+                                            mslr = mappyfile.loads(strLr)
 
-                                        lyrs.insert(len(lyrs) + 1, mslr)
-                                        #except Exception as e:
-                                        #    print("Failed creation of layer {0}; {1}".format(b, e))
+                                            lyrs.insert(len(lyrs) + 1, mslr)
+                                        except Exception as e:
+                                            print("Failed creation of layer {0}; {1}".format(fb, e))
 
-                                        print (fileinfo['datatype'] )
                                         # does metadata already include a link to wms/wfs? else add it.
                                         for mdlinktype in config['mdLinkTypes']:
-                                           
+                                            relPath2 = relPath if dir_out_mode == 'nested' else ''
                                             if mdlinktype in ['OGC:WMS']:
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, b, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
                                             elif fileinfo['datatype'] == 'raster' and mdlinktype == 'OGC:WCS':
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, b, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
                                             elif fileinfo['datatype'] == 'vector' and mdlinktype == 'OGC:WFS' :
                                                 if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, b, file, relPath, mf['name'], config)
+                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
 
     # map should have initial layer, remove it
     lyrs.pop(0)
@@ -234,13 +241,20 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive, confi
     # print(mappyfile.dumps(mf))
     # write to parent folder as {folder}.map
     if len(lyrs) > 0: # do not create mapfile if no layers
-        mapfile = str(dir_out + relPath + os.sep + '..' + os.sep + mf['name'] + ".map")
-        print(f'writing mapfile {mapfile}')
+        do = os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''))
+        mapfile =  os.path.join(do,mf['name'] + ".map")
         
+        # check if folder exists
+        if not os.path.exists(do):
+            print('create folder',do)
+            os.makedirs(do)
+            
+        print(f'writing mapfile {mapfile}')
         mappyfile.save(mf, mapfile, 
             indent=4, spacer=' ', quote='"', newlinechar='\n',
             end_comment=False, align_values=False)
-
+    else:
+        print('Map empty, skip creation')
 
 '''
 Verify if this metadata already has a link to this service
@@ -262,8 +276,9 @@ def addLink(type, layer, file, relPath, map, config):
     # add link
         if 'distribution' not in orig.keys():
             orig['distribution'] = {}
+        msUrl2 = config['msUrl'] + ('/'+ relPath if relPath != '' else '')
         orig['distribution'][type.split(':').pop()] = {
-            'url': config['msUrl'] + relPath+'?service='+type.split(':').pop()+'&amp;request=GetCapabilities',
+            'url':  msUrl2 + '/' + map +'?service='+type.split(':').pop()+'&amp;request=GetCapabilities',
             'type': type,
             'name': layer,
             'description': ''
@@ -275,15 +290,22 @@ def addLink(type, layer, file, relPath, map, config):
 '''
 sets a color coding for a layer
 '''
-def colorCoding(min,max):
-    rng = max - min
-    if rng > 0:
-        sgmt = rng/8
-        cur = min
-        clsstr = ""
-        for clr in ["'#fcfdbf'","'#fec085'","'#fa825f'","'#e14d67'","'#ae347c'","'#782282'","'#440f76'","'#150e37'"]:
-            clsstr += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR {2}\nEND\nEND\n\n".format(cur,cur+sgmt,clr)
-            cur += sgmt
-        return clsstr
-    else:
+def colorCoding(min,max,colors):
+    try: 
+        getcontext().prec = 4 # set precision of decimals, so classes are not too specific
+        rng = Decimal(max - min)
+        if rng > 0:
+            sgmt =  Decimal(rng/len(colors))
+            cur =  Decimal(min)
+            clsstr = ""
+            for clr in colors:
+                clsstr += "CLASS\nNAME '{0} - {1}'\nEXPRESSION ( [pixel] >= {0} AND [pixel] <= {1} )\nSTYLE\nCOLOR '{2}'\nEND\nEND\n\n".format(cur,(cur+sgmt),clr)
+                cur += sgmt
+            return clsstr
+        else:
+            return ""
+    except Exception as e:
+        print('WARNING: Unable to assign colors to band range',str(e))
         return ""
+
+

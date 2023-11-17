@@ -2,33 +2,33 @@
 {% import 'common/iso19139-charstring.j2' as cs %}
 <gmd:MD_Metadata xmlns:gco="http://www.isotc211.org/2005/gco" xmlns:gmd="http://www.isotc211.org/2005/gmd" xmlns:gml="http://www.opengis.net/gml" xmlns:gmx="http://www.isotc211.org/2005/gmx" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.isotc211.org/2005/gmd http://www.isotc211.org/2005/gmd/gmd.xsd http://www.isotc211.org/2005/gmx http://www.isotc211.org/2005/gmx/gmx.xsd">
   <gmd:fileIdentifier>
-    <gco:CharacterString>{{ record['metadata']['identifier']|e }}</gco:CharacterString>
+    <gco:CharacterString>{{ record.get('metadata',{})['identifier']|e }}</gco:CharacterString>
   </gmd:fileIdentifier>
   <gmd:language>
-    <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeSpace="ISO 639-2" codeListValue="{{ record['metadata']['language'] }}">{{ record['metadata']['language'] }}</gmd:LanguageCode>
+    <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeSpace="ISO 639-2" codeListValue="{{ record.get('metadata',{}).get('language') }}">{{ record.get('metadata',{}).get('language') }}</gmd:LanguageCode>
   </gmd:language>
   <gmd:characterSet>
-    <gmd:MD_CharacterSetCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_CharacterSetCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['metadata']['charset'] }}">{{ record['metadata']['charset'] }}</gmd:MD_CharacterSetCode>
+    <gmd:MD_CharacterSetCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_CharacterSetCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('metadata',{})['charset'] }}">{{ record.get('metadata',{})['charset'] }}</gmd:MD_CharacterSetCode>
   </gmd:characterSet>
-  {% if record['metadata']['parentidentifier'] %}
+  {% if record.get('metadata',{})['parentidentifier'] %}
   <gmd:parentIdentifier>
-    <gco:CharacterString>{{ record['metadata']['parentidentifier']|e }}</gco:CharacterString>
+    <gco:CharacterString>{{ record.get('metadata',{})['parentidentifier']|e }}</gco:CharacterString>
   </gmd:parentIdentifier>
   {% endif %}
   <gmd:hierarchyLevel>
-    <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['metadata']['hierarchylevel'] }}">{{ record['metadata']['hierarchylevel'] }}</gmd:MD_ScopeCode>
+    <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('metadata',{})['hierarchylevel'] }}">{{ record.get('metadata',{})['hierarchylevel'] }}</gmd:MD_ScopeCode>
   </gmd:hierarchyLevel>
   {% for key, value in record['contact'].items() %}
   {% if key in ['distributor', 'pointOfContact'] %}
   <gmd:contact>
     {% set contact = value %}
-    {% set role = key %}
+    {% set role = contact['role'] or key %}
     {% include "contact.j2" %}
   </gmd:contact>
   {% endif %}
   {% endfor %}
   <gmd:dateStamp>
-    {% set datestamp = record['metadata']['datestamp']|normalize_datestring %}
+    {% set datestamp = record.get('metadata',{})['datestamp']|normalize_datestring %}
     {% if datestamp|length > 11 %}
     <gco:DateTime>{{ datestamp }}</gco:DateTime>
     {% else %}
@@ -41,25 +41,25 @@
   <gmd:metadataStandardVersion>
     <gco:CharacterString>ISO 19115:2003</gco:CharacterString>
   </gmd:metadataStandardVersion>
-  {% if record['metadata']['dataseturi'] %}
+  {% if record.get('metadata',{})['dataseturi'] %}
   <gmd:dataSetURI>
-    <gco:CharacterString>{{ record['metadata']['dataseturi'] | e }}</gco:CharacterString>
+    <gco:CharacterString>{{ record.get('metadata',{})['dataseturi'] | e }}</gco:CharacterString>
   </gmd:dataSetURI>
   {% endif %}
-  {% if record['metadata']['language_alternate'] %}
+  {% if record.get('metadata',{}).get('language_alternate') %}
   <gmd:locale>
     <gmd:PT_Locale id="locale-fr">
       <gmd:languageCode>
-        <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeSpace="ISO 639-2" codeListValue="{{ record['metadata']['language_alternate'] }}">{{ record['metadata']['language_alternate'] }}</gmd:LanguageCode>
+        <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeSpace="ISO 639-2" codeListValue="{{ record.get('metadata',{}).get('language_alternate') }}">{{ record.get('metadata',{}).get('language_alternate') }}</gmd:LanguageCode>
       </gmd:languageCode>
       <gmd:characterEncoding>
-        <gmd:MD_CharacterSetCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_CharacterSetCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['metadata']['charset'] }}">{{ record['metadata']['charset'] }}</gmd:MD_CharacterSetCode>
+        <gmd:MD_CharacterSetCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_CharacterSetCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('metadata',{})['charset'] }}">{{ record.get('metadata',{})['charset'] }}</gmd:MD_CharacterSetCode>
       </gmd:characterEncoding>
     </gmd:PT_Locale>
   </gmd:locale>
   {% endif %}
   <gmd:spatialRepresentationInfo>
-    {% if record['spatial']['datatype'] == 'vector' %}
+    {% if record.get('spatial',{}).get('datatype','') == 'vector' %}
     <gmd:MD_VectorSpatialRepresentation>
       <gmd:topologyLevel>
         <gmd:MD_TopologyLevelCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_TopologyLevelCode" codeSpace="ISOTC211/19115" codeListValue="geometryOnly">geometryOnly</gmd:MD_TopologyLevelCode>
@@ -67,7 +67,7 @@
       <gmd:geometricObjects>
         <gmd:MD_GeometricObjects>
           <gmd:geometricObjectType>
-            <gmd:MD_GeometricObjectTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_GeometricObjectTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['spatial']['geomtype'] }}">{{ record['spatial']['geomtype'] }}</gmd:MD_GeometricObjectTypeCode>
+            <gmd:MD_GeometricObjectTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_GeometricObjectTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('spatial',{}).get('geomtype','') }}">{{ record.get('spatial',{}).get('geomtype','') }}</gmd:MD_GeometricObjectTypeCode>
           </gmd:geometricObjectType>
         </gmd:MD_GeometricObjects>
       </gmd:geometricObjects>
@@ -79,7 +79,7 @@
       <gmd:referenceSystemIdentifier>
         <gmd:RS_Identifier>
           <gmd:code>
-            <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ record['identification']['extents']['spatial'][0]['crs']|e }}</gco:CharacterString>
+            <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ record['identification']['extents'].get('spatial',[{}])[0].get('crs','') | e }}</gco:CharacterString>
           </gmd:code>
         </gmd:RS_Identifier>
       </gmd:referenceSystemIdentifier>
@@ -89,7 +89,7 @@
     <gmd:MD_DataIdentification>
       <gmd:citation>
         <gmd:CI_Citation>
-          {{ cs.get_freetext('title', record['metadata']['language_alternate'], get_charstring(record['identification'].get('title'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+          {{ cs.get_freetext('title', record.get('metadata',{}).get('language_alternate',''), get_charstring(record['identification'].get('title'), record.get('metadata',{}).get('language','en'), record.get('metadata',{}).get('language_alternate'))) }}
           {% for date_type, date in record['identification']['dates'].items() %}
           {% set datestamp = date|normalize_datestring %}
           <gmd:date>
@@ -108,14 +108,16 @@
           </gmd:date>
           {% endfor %}
           {% if record['identification']['edition'] %}
-          {{ cs.get_freetext('edition', record['metadata']['language_alternate'], get_charstring(record['identification'].get('edition'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+          {{ cs.get_freetext('edition', record.get('metadata',{}).get('language_alternate'), get_charstring(record['identification'].get('edition'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
           {% endif %}
         </gmd:CI_Citation>
       </gmd:citation>
-      {{ cs.get_freetext('abstract', record['metadata']['language_alternate'], get_charstring(record['identification'].get('abstract'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+      {{ cs.get_freetext('abstract', record.get('metadata',{}).get('language_alternate'), get_charstring(record['identification'].get('abstract'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
+      {% if record['identification']['status'] %}
       <gmd:status>
         <gmd:MD_ProgressCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ProgressCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['status'] }}">{{ record['identification']['status'] }}</gmd:MD_ProgressCode>
       </gmd:status>
+      {% endif %}
       {% if record['contact'] %}
       {% for role, contact in record['contact'].items()  %}
       <gmd:pointOfContact>
@@ -142,7 +144,7 @@
       {% for key, value in record['identification']['keywords'].items() %}
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
-        {% set keywords = get_charstring(value.get('keywords'), record['metadata']['language'], record['metadata']['language_alternate']) %}
+        {% set keywords = get_charstring(value.get('keywords'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate')) %}
         {% if keywords[0] is not none %}
         {% if keywords[1] is none %}
           {# No language_alternate is specified #}
@@ -151,7 +153,7 @@
           {% endfor %}
         {% else %}
           {% for kw1, kw2 in zip(keywords[0], keywords[1]) %}
-          {{ cs.get_freetext('keyword', record['metadata']['language_alternate'], [kw1, kw2]) }}
+          {{ cs.get_freetext('keyword', record.get('metadata',{}).get('language_alternate'), [kw1, kw2]) }}
           {% endfor %}
         {% endif %}
         {% endif %}
@@ -163,10 +165,10 @@
             <gmd:CI_Citation>
               {% if value['vocabulary']['name'] and value['vocabulary']['url'] %}
               <gmd:title>
-                <gmx:Anchor xlink:title="{{ get_charstring(value['vocabulary'].get('name'), record['metadata']['language'], record['metadata']['language_alternate'])[0] }}" xlink:href="{{ value['vocabulary']['url'] }}">{{  get_charstring(value['vocabulary'].get('name'), record['metadata']['language'], record['metadata']['language_alternate'])[0] }}</gmx:Anchor>
+                <gmx:Anchor xlink:title="{{ get_charstring(value['vocabulary'].get('name'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))[0] }}" xlink:href="{{ value['vocabulary']['url'] }}">{{  get_charstring(value['vocabulary'].get('name'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))[0] }}</gmx:Anchor>
               </gmd:title>
               {% elif not value['vocabulary']['url'] %}
-              {{ cs.get_freetext('title', record['metadata']['language_alternate'], get_charstring(value['vocabulary'].get('name'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+              {{ cs.get_freetext('title', record.get('metadata',{}).get('language_alternate'), get_charstring(value['vocabulary'].get('name'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
               {% endif %}
               <gmd:date>
                 <gmd:CI_Date>
@@ -185,17 +187,17 @@
           <gmd:accessConstraints>
             <gmd:MD_RestrictionCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_RestrictionCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['identification']['accessconstraints'] }}">{{ record['identification']['accessconstraints'] }}</gmd:MD_RestrictionCode>
           </gmd:accessConstraints>
-          {{ cs.get_freetext('otherConstraints', record['metadata']['language_alternate'], get_charstring(record['identification'].get('rights'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+          {{ cs.get_freetext('otherConstraints', record.get('metadata',{}).get('language_alternate'), get_charstring(record['identification'].get('rights'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
         </gmd:MD_LegalConstraints>
       </gmd:resourceConstraints>
       <gmd:spatialRepresentationType>
-        <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['spatial']['datatype'] }}">{{ record['spatial']['datatype'] }}</gmd:MD_SpatialRepresentationTypeCode>
+        <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('spatial',{}).get('datatype','') }}">{{ record.get('spatial',{}).get('datatype','') }}</gmd:MD_SpatialRepresentationTypeCode>
       </gmd:spatialRepresentationType>
-      {% if record['identification']['language'] in ['inapplicable', 'missing', 'template', 'unknown', 'withheld'] %}
-      <gmd:language gco:nilReason="{{ record['identification']['language'] }}"/>
+      {% if record['identification'].get('language') in ['inapplicable', 'missing', 'template', 'unknown', 'withheld'] %}
+      <gmd:language gco:nilReason="{{ record['identification'].get('language') }}"/>
       {% else %}
       <gmd:language>
-        <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeSpace="ISO 639-2" codeListValue="{{ record['identification']['language'] }}">{{ record['identification']['language'] }}</gmd:LanguageCode>
+        <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeSpace="ISO 639-2" codeListValue="{{ record['identification'].get('language') }}">{{ record['identification'].get('language') }}</gmd:LanguageCode>
       </gmd:language>
       {% endif %}
       <gmd:characterSet>
@@ -268,7 +270,7 @@
           {% endfor %}
         </gmd:EX_Extent>
       </gmd:extent>
-      {{ cs.get_freetext('supplementalInformation', record['metadata']['language_alternate'], get_charstring(record['identification'].get('url'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+      {{ cs.get_freetext('supplementalInformation', record.get('metadata',{}).get('language_alternate'), get_charstring(record['identification'].get('url'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
     </gmd:MD_DataIdentification>
   </gmd:identificationInfo>
   {% if record['content_info'] %}
@@ -350,8 +352,8 @@
               <gmd:protocol>
                 <gco:CharacterString>{{ v['type']|e }}</gco:CharacterString>
               </gmd:protocol>
-              {{ cs.get_freetext('name', record['metadata']['language_alternate'], get_charstring(v.get('name'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
-              {{ cs.get_freetext('description', record['metadata']['language_alternate'], get_charstring(v.get('description'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+              {{ cs.get_freetext('name', record.get('metadata',{}).get('language_alternate'), get_charstring(v.get('name'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
+              {{ cs.get_freetext('description', record.get('metadata',{}).get('language_alternate'), get_charstring(v.get('description'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
               {% if v['function'] %}
               <gmd:function>
                 <gmd:CI_OnLineFunctionCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#CI_OnLineFunctionCode" codeSpace="ISOTC211/19115" codeListValue="{{ v['function'] }}">{{ v['function'] }}</gmd:CI_OnLineFunctionCode>
@@ -374,13 +376,13 @@
       <gmd:scope>
         <gmd:DQ_Scope>
           <gmd:level>
-            <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record['dataquality']['scope']['level'] or 'dataset' }}">{{ record['dataquality']['scope']['level'] }}</gmd:MD_ScopeCode>
+            <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('dataquality',{}).get('scope',{}).get('level') or 'dataset' }}">{{ record.get('dataquality',{}).get('scope',{}).get('level') }}</gmd:MD_ScopeCode>
           </gmd:level>
         </gmd:DQ_Scope>
       </gmd:scope>
       <gmd:lineage>
         <gmd:LI_Lineage>
-          {{ cs.get_freetext('statement', record['metadata']['language_alternate'], get_charstring(record['dataquality']['lineage'].get('statement'), record['metadata']['language'], record['metadata']['language_alternate'])) }}
+          {{ cs.get_freetext('statement', record.get('metadata',{}).get('language_alternate'), get_charstring(record.get('dataquality',{}).get('lineage',{}).get('statement'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
         </gmd:LI_Lineage>
       </gmd:lineage>
     </gmd:DQ_DataQuality>
