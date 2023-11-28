@@ -1,13 +1,12 @@
-from geodatacrawler.utils import dict_merge,indexSpatialFile
+from geodatacrawler.utils import dict_merge,indexFile
 
-def test_indexSpatialFile():
-    r = indexSpatialFile('./demo/line.shp','shp')
+def test_indexFile():
+    r = indexFile('./demo/line.shp','shp')
     assert r['datatype'] == 'vector'
     assert r['geomtype'] == 'LineString'
-    r = indexSpatialFile('./demo/nested/raster2.tif','tif')
+    r = indexFile('./demo/nested/raster2.tif','tif')
     assert r['datatype'] == 'raster'
-    assert r['content_info']['dimensions'][0]['width'] == 163
-
+    assert r['content_info']['dimensions'][0]['max'] == 2.0
 
 def test_dict_merge():
     foo = {
