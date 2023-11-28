@@ -234,13 +234,14 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                         myDatasets = {}
                                         if len(hasFiles.keys()) > 0:
                                             
-                                            # remove the original file? str(file)
-                                            try:
-                                                os.remove(str(fname))
-                                            except Exception as e:
-                                                print ('can not remove original file',fname,e)
+                                            # remove the original file? str(file) no, because it can define the service?
+                                            #try:
+                                            # os.remove(str(fname))
+                                            #except Exception as e:
+                                            #    print ('can not remove original file',fname,e)
 
                                             for k,l in hasFiles.items():
+                                                print('ttl',l['meta']['identification']['title'])
                                                 # are they vizualistations of the same dataset, or unique?
                                                 # see if their identification is unique, else consider them distributions of the same dataset
                                                 
@@ -266,7 +267,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                     nw = deepcopy(orig)
                                                     # merge incoming 
                                                     if 'meta' in l:
-                                                        myDatasets['LayerID'] = l['meta']
+                                                        myDatasets[LayerID] = l['meta']
                                                     else:
                                                         myDatasets['LayerID'] = {
                                                             'metadata': {'identifier': l.get('metaidentifier',l.get('identifier',nw['metadata']['identifier']))},

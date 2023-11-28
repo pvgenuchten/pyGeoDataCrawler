@@ -210,6 +210,11 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         return {}
     matchedLayers = {}
 
+    capmd = {
+                'mcf':{'version':'1.0'},
+                'distribution':{}
+            }
+
     # 3 situations can occur; name=single, name=mulitple, name=all
 
     if '//' not in url: # this fails if url has '//' elsewhere
@@ -233,13 +238,9 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         if capabs:
 
             idf = dict(capabs);
-
-            capmd = {
-                'mcf':{'version':'1.0'},
-                'identification': idf['identification'],
-                'contact': idf['contact'],
-                'distribution':{}
-            }
+            capmd['identification'] = idf['identification']
+            capmd['contact'] = idf['contact']
+            
             #only copy contact if it is not empty
             #if (idf.get('contact',{}).get('distributor',{}).get('organization','') != '' 
             #    or idf.get('contact',{}).get('distributor',{}).get('individualName','') != ''):
@@ -295,6 +296,31 @@ def checkOWSLayer(url, protocol, name, identifier, title):
             
             # not found matched layer?
                 # suggestion for a layer?? 
+    elif 'CSW' in protocol.upper():  
+        from owslib.csw import CatalogueServiceWeb
+        from owslib.fes import PropertyIsEqualTo, PropertyIsLike, BBox
+        csw = CatalogueServiceWeb(url)
+
+        # qry = PropertyIsEqualTo('csw:AnyText', 'soil')
+        nextRecord = 1
+        returned = 1
+        recs = {}
+        while nextRecord > 0 and returned > 0:
+            csw.getrecords2(maxrecords=250,outputschema='http://www.isotc211.org/2005/gmd',startposition=nextRecord)
+            print('CSW query ' + str(csw.results['returned']) + ' of ' + str(csw.results['matches']) + ' records from ' + str(nextRecord) + '.')
+            nextRecord = csw.results['nextrecord']
+            returned = csw.results['returned']
+            
+            for rec in csw.records:
+                try:
+                    md = {'metaidentifier': csw.records[rec].identifier}
+                    md['meta'] = parseISO(csw.records[rec].xml,url.split('?')[0]+'?service=CSW&version=2.0.1&request=GetRecordbyID&id='+csw.records[rec].identifier)
+                    recs[csw.records[rec].identifier] = md
+                    
+                except Exception as e:
+                    print(f"Parse CSW results failed ; {str(e)}")
+        capmd['distribution'] = recs
+        return capmd
 
     elif 'WFS' in protocol.upper():  
         print('WFS not implemented',url,identifier)
@@ -487,15 +513,17 @@ def getUser(fname):
 
 def parseISO(strXML, u):
     # check if a csw request
-    if 'getrecordbyid' in u.lower():
+    if 'GetRecordByIdResponse' in str(strXML):
         try:
             doc = etree.fromstring(strXML)
         except ValueError:
+            print('initial parse failed')
             doc = etree.fromstring(bytes(strXML, 'utf-8'))
         nsmap = {}
         for ns in doc.xpath('//namespace::*'):
             if ns[0]:
                 nsmap[ns[0]] = ns[1]
+
         md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
         strXML = etree.tostring(md[0])
 
