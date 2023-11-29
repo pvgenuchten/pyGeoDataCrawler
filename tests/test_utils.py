@@ -6,7 +6,7 @@ def test_indexFile():
     assert r['geomtype'] == 'LineString'
     r = indexFile('./demo/nested/raster2.tif','tif')
     assert r['datatype'] == 'raster'
-    assert r['content_info']['dimensions'][0]['max'] == 2.0
+    assert r['content_info']['dimensions'][0]['max'] == 120.0
 
 def test_dict_merge():
     foo = {

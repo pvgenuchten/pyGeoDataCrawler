@@ -58,8 +58,8 @@ def indexFile(fname, extension):
                 srcband.ComputeStatistics(0)
             bands.append({
                     "name": srcband.GetDescription(),
-                    "min": srcband.GetMaximum(),
-                    "max": srcband.GetMinimum(),
+                    "min": srcband.GetMinimum(),
+                    "max": srcband.GetMaximum(),
                     "nodata": int(srcband.GetNoDataValue() or 0),
                     "units": str(srcband.GetUnitType() or '')
             })
