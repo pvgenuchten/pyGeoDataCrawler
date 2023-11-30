@@ -102,7 +102,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
 
     for file in Path(target_path).iterdir():
         fname = str(file).split(os.sep).pop()
-        if file.is_dir() and not fname.startswith('.') and not fname.startswith('~'):
+        if file.is_dir() and not fname.startswith('.') and not fname.startswith('~') and not str(file).endswith('.gdb'):
             # go one level deeper
             if skipSubfolders:
                 print('Skip path: '+ str(file))

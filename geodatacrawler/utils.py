@@ -150,20 +150,26 @@ def dict_merge(dct, merge_dct):
                 print(e,"; k:",k,"; v:",v)
 
 
-def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
+def wkt2epsg(crs):
+    if crs == None:
+        return ""
+    if isinstance(crs,str):
+        crs = osr.SpatialReference(crs)
     try:
-        crs = CRS.from_wkt(wkt)
-        epsg = crs.to_epsg()
+        epsg = crs.AutoIdentifyEPSG()
+        if epsg == 0:
+            epsg_id = int(crs.GetAuthorityCode(None))
+            assert epsg_id is not None
+            return epsg_id
+        else:
+            matches = crs.FindMatches()
+            for m in matches:
+                if m[1] >= 50:
+                    return wkt2epsg(m[0])
+            print("Authoritative EPSG ID could not be found")
     except Exception as e:
-        print('Invalid src (wkt) provided: ', e,'proj:', wkt)
-    if not epsg:
-        if ('GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]' in wkt):
-            return "epsg:42106"
-        elif ('GEOGCS["GCS_WGS_1984_ellipse",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["Degree",0.0174532925199433]],PROJECTION["Interrupted_Goode_Homolosine"],PARAMETER["central_meridian",0],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]' in wkt):
-            return "epsg:54052"
-        print('Unable to identify: ' + wkt)
-    else:
-        return "epsg:" + str(epsg) 
+        print('Error parsing crs: ', e, str(crs))
+        return ""
 
 def isDistributionLocal(url, path):
     parsed = urlparse(url, allow_fragments=False)
@@ -176,16 +182,6 @@ def isDistributionLocal(url, path):
 
 def reprojectBounds(bnds,source,trg):
     if source:
-        # Setup the source projection - you can also import from epsg, proj4...
-        #source = osr.SpatialReference()
-        #try:
-        #    source.ImportFromWkt(src)
-        #except Exception as e:
-        #    print('Invalid src (wkt) provided: ', e)
-        #    return None
-        #if not source:
-        #    print('Error while importing wkt from source: ', src)
-        #    return None
         target = osr.SpatialReference()
         target.ImportFromEPSG(trg)
         try:
@@ -197,7 +193,7 @@ def reprojectBounds(bnds,source,trg):
         except:
             return None
     else:
-        print('No projection info provided', src)
+        print('No projection info provided')
         return None
 
 '''
