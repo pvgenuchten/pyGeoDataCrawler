@@ -6,9 +6,8 @@ import pprint
 import urllib.request
 from copy import deepcopy
 from pwd import getpwuid
-import fiona
 from pyproj import CRS
-from osgeo import gdal, osr
+from osgeo import gdal, osr, ogr
 from urllib.parse import urlparse, parse_qsl
 from owslib.iso import *
 from owslib.etree import etree
@@ -16,8 +15,6 @@ import json
 import requests as req
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from geodatacrawler import GDCCONFIG
-
-fiona.supported_drivers["OGR_VRT"] = "r"
 
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
@@ -83,30 +80,32 @@ def indexFile(fname, extension):
 
     elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
         print(f"file {fname} indexed as VECTOR_FILE_TYPE")
-        with fiona.open(fname, "r") as source:
-            content['datatype'] = "vector"
-            try:
-                content['geomtype'] = source[0]['geometry']['type']
-            except Exception as e:
-                print("Failed fetching geometry type; {0}".format(e))
-                content['type'] = "table"
-            try:  # this sometimes fails, for example on csv files
-                b = source.bounds
-                content['bounds'] = [b[0],b[1],b[2],b[3]]
-                content['bounds_wgs84'] = reprojectBounds([b[0],b[1],b[2],b[3]],source.crs,4326)
-            except:
-                print('Failed reading bounds')
-            try:
-                content['crs'] = wkt2epsg(source.crs)
-            except:
-                print('Failed reading crs')
-            content['content_info'] = {"attributes":{}}    
 
-            try:
-                for k, v in source.schema['properties'].items():
-                    content['content_info']['attributes'][k] = v
-            except:
-                print('Failed reading properties')
+        tp=""
+        srs=""
+        b=""
+        attrs = {}
+        ds = ogr.Open(fname)
+        for i in ds:
+            ln = i.GetName()
+            b = i.GetExtent()
+            fc = i.GetFeatureCount()
+            srs = i.GetSpatialRef()
+            tp = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType())
+            attrs = {}
+            for f in range(i.GetLayerDefn().GetFieldCount()):
+                fld = i.GetLayerDefn().GetFieldDefn(f)
+                ftt = fld.GetTypeName()
+                # ft = fld.GetFieldTypeName(ftt)
+                fn = fld.GetName()
+                attrs[fn] = ftt
+                
+        content['content_info'] = {"attributes":attrs}
+        content['datatype'] = "vector"
+        content['geomtype'] = tp
+        content['bounds'] = [b[0],b[1],b[2],b[3]]
+        content['bounds_wgs84'] = reprojectBounds([b[0],b[1],b[2],b[3]],srs,4326)
+        content['crs'] = wkt2epsg(srs)
 
         # check if local mcf exists
         # else use mcf from a parent folder
@@ -175,18 +174,18 @@ def isDistributionLocal(url, path):
     else:
         return None
 
-def reprojectBounds(bnds,src,trg):
-    if src and len(src) > 0:
+def reprojectBounds(bnds,source,trg):
+    if source:
         # Setup the source projection - you can also import from epsg, proj4...
-        source = osr.SpatialReference()
-        try:
-            source.ImportFromWkt(src)
-        except Exception as e:
-            print('Invalid src (wkt) provided: ', e)
-            return None
-        if not source:
-            print('Error while importing wkt from source: ', src)
-            return None
+        #source = osr.SpatialReference()
+        #try:
+        #    source.ImportFromWkt(src)
+        #except Exception as e:
+        #    print('Invalid src (wkt) provided: ', e)
+        #    return None
+        #if not source:
+        #    print('Error while importing wkt from source: ', src)
+        #    return None
         target = osr.SpatialReference()
         target.ImportFromEPSG(trg)
         try:
@@ -599,10 +598,11 @@ def fetchUrl(url):
         return req.get(url, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
 
 def safeFileName(n):
-    ''' remove unsafe characters from a var to make it safe'''
-
-    for i in ['(',')','[',']','{','}','&','~','%','+',',']:
-        n = n.replace(i,'')
-    for i in ['#',' ','!','+','/','\\',':',';']:
-        n = n.replace(i,'-')
-    return n
+    if n not in [None,'']:
+        ''' remove unsafe characters from a var to make it safe'''
+        for i in ['(',')','[',']','{','}','&','~','%','+',',']:
+            n = n.replace(i,'')
+        for i in ['#',' ','!','+','/','\\',':',';']:
+            n = n.replace(i,'-')
+        return n
+    return ""

@@ -485,13 +485,22 @@ def checkId(md, fn, prefix):
 
 # format a index dict as pygeometa
 def asPGM(dct,fname):
+
+    # make sure dcparams are available and not None
+    dcparams = 'contentStatus,lastPrinted,revision,version,creator,lastModifiedBy,modified,created,title,subject,description,identifier,language,keywords,category'.split(',')
+    for p in dcparams:
+        if p not in dct.keys() or dct[p] == None:
+            dct[p] = ""
+
     tpl = pkg_resources.open_text(templates, 'PGM.tpl')
     exp = yaml.safe_load(tpl)
     for k in ['metadata','spatial','identification','distribution']:
         if not k in exp.keys():
             exp[k] = {}
     
-    exp['identification']['title'] = dct.get('name',dct.get('title',fname))
+    if 'name' not in dct.keys() or dct['name'] in [None,'']:
+        dct['name'] = fname
+    exp['identification']['title'] = dct['name']
     exp['metadata']['identifier'] = dct.get('identifier',safeFileName(exp['identification']['title']))
     exp['identification']['abstract'] = dct.get('description','')
 
