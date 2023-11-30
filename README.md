@@ -85,6 +85,77 @@ export pgdc_webdav_url="https://example.com/data"
 
 A [mapserver docker](https://github.com/camptocamp/docker-mapserver) image is provided by Camp to Camp which is able to expose a number of mapfiles as mapservices, eg http://example.com/{mapfile}?request=getcapabilities&service=wms. Each mapfile needs to be configured as alias in [mapserver config file](https://mapserver.org/mapfile/config.html).
 
+### Layer styling
+
+You can now set dedicated layer styling for grids and vectors.
+
+- Add mapserver mapfile syntax to the mcf robot section
+
+```yaml
+robot:
+  map:
+    styles: |
+      CLASS
+        NAME "style"
+        STYLE
+          COLOR 100 100 100
+          SIZE 8
+          WIDTH 1
+        END
+      END
+```
+
+For grids, several additional options exist:
+
+- A range of colors, the min-max range of the band is devided by the number of colors. Note that you can define multiple styles per layer, the last is used as default.
+
+```yaml
+robot:
+  map:
+    styles:
+      - name: rainbow
+        classes: "#ff000,#ffff00,#00ff00,#00ffff,#0000ff"
+      - name: grays
+        classes: "#00000,#333333,#666666,#999999,#cccccc,#ffffff"
+```
+
+- A range of distinct values, you can also use rgb colors
+
+```yaml
+robot:
+  map:
+    styles:
+      - name: rainbow
+        classes: 
+          - label: True
+            val: 1
+            color: "0 255 0"
+          - label: False
+            val: 0
+            color: "255 0 0" 
+```
+
+- A range of classes
+
+```yaml
+robot:
+  map:
+    styles:
+      - name: Scale
+        classes: 
+          - label: Low
+            min: 0
+            max: 100
+            color: "#0000ff"
+          - label: Medium
+            min: 100
+            max: 200
+            color: "#00ff00"
+          - label: High
+            min: 200
+            max: 300
+            color: "#ff0000" 
+```
 
 ## Development
 
