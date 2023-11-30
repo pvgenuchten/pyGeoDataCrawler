@@ -179,9 +179,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                         # evaluate if a custom style is defined
                                         band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0]
                                         new_class_string2 = 'PROCESSING "NODATA=' + str(band1.get('nodata', 32768)) + '"\n'
-                                        for style_reference in ly.get("styles", []):
-                                            style_reference['name'] = style_reference.get("name","Default")
-                                            new_class_string2 += f"CLASSGROUP {style_reference['name']}\n"
+                                        for style_reference in ly.get("styles", []): 
+                                            
+                                            new_class_string2 += f"CLASSGROUP \"{style_reference.get('name','Default')}\"\n"
                                             if fileinfo['type']=='raster': # set colors for range, only first band supported
                                                 new_class_string2 += colorCoding(band1.get('min',0), band1.get('max',0),style_reference)
                                             else: # vector
@@ -196,7 +196,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                             # else:
                                             #     print(f'Stylefile {stylefile} does not exist')
                                             #     new_class_string2 = ""
-                                                
+
                                         new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
 
                                         strLr = new_layer_string.format(name=fb,
@@ -253,7 +253,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
             indent=4, spacer=' ', quote='"', newlinechar='\n',
             end_comment=False, align_values=False)
     else:
-        print('Map empty, skip creation')
+        print('Folder ' + os.path.join(config['rootDir'],relPath) + ' empty, skip creation')
 
 '''
 Verify if this metadata already has a link to this service
@@ -309,8 +309,10 @@ def colorCoding(min,max,style):
     if isinstance(style,list):
         return colorCoding(min,max,{"classes":style}) # backwards compat
     elif isinstance(style,dict): # 3 cases: array of color, array of ranges, array of absolutes
-        classes = style.get('classes',['#999999'])
+        classes = style.get('classes',['#ff0000','#ffff00','#00ff00','#00ffff','#0000ff'])
         clsstr = ""
+        if isinstance(classes,str):
+            classes = classes.split(',')
         if isinstance(classes[0],str) or isinstance(classes[0],list):
             getcontext().prec = 4 # set precision of decimals, so classes are not too specific
             rng = Decimal(max - min)
@@ -331,10 +333,10 @@ def colorCoding(min,max,style):
                 clr = hexcolor(cls.get('color','#999999'))
                 if 'val' in cls.keys():
                     lbl = cls.get('label',str(cls['val']))
-                    clsstr += f"CLASS\nNAME '{lbl}'\nGROUP '{cls.get('name','Default')}'\nEXPRESSION ( [pixel] = {cls['val']} )\nSTYLE\nCOLOR '{clr}'\nEND\nEND\n\n"
+                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [pixel] = {cls['val']} )\nSTYLE\nCOLOR \"{clr}\"\nEND\nEND\n\n"
                 elif 'min' in cls.keys() and 'max' in cls.keys():
                     lbl = cls.get('label',(str(cls['min'])+' - '+str(cls['max'])))
-                    clsstr += f"CLASS\nNAME '{lbl}'\nGROUP '{cls.get('name','Default')}'\nEXPRESSION ( [pixel] >= {cls['min']} AND [pixel] <= {cls['max']} )\nSTYLE\nCOLOR '{clr}'\nEND\nEND\n\n"   
+                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [pixel] >= {cls['min']} AND [pixel] <= {cls['max']} )\nSTYLE\nCOLOR \"{clr}\"\nEND\nEND\n\n"
             return clsstr
         else:
             print('type '+ str(type(classes[0])) +' not recognised for class') 
@@ -346,13 +348,14 @@ def colorCoding(min,max,style):
 '''
 if color is rgb, return as hex
 '''
-def hexcolor(clr):  
-    print(clr)
+def hexcolor(clr):
     if isinstance(clr,list):
         return '#{:02x}{:02x}{:02x}'.format(int(clr[0]),int(clr[1]),int(clr[2]))
     elif len(clr.split(' ')) == 3:
         return hexcolor(clr.split(' '))
-    else: # could check if starts with 
+    #elif len(clr) == 7 and clr.startswith('#'): # could check if starts with '#'
+    #    return clr
+    else: 
         return clr
 
 
