@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "geodatacrawler"
-version = "1.2.2"
+version = "1.2.3"
 license = "MIT"
 description = "a crawler script to extract and author metadata of spatial datasets"
 authors = ["Paul van Genuchten <genuchten@yahoo.com>"]
@@ -14,11 +14,9 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.8"
 PyYAML = "^6.0"
-Fiona = "^1.8.21"
-rasterio = "^1.2.10"
 pysqlite3 = "^0.4.6"
 mappyfile = "^0.9.7"
-GDAL = "3.3.2"
+GDAL = "^3.3.2"
 pyproj = "^3.4.0"
 OWSLib = "^0.27.2"
 pygeometa = "0.13.1"

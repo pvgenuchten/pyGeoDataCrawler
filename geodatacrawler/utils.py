@@ -6,9 +6,8 @@ import pprint
 import urllib.request
 from copy import deepcopy
 from pwd import getpwuid
-import fiona
 from pyproj import CRS
-from osgeo import gdal, osr
+from osgeo import gdal, osr, ogr
 from urllib.parse import urlparse, parse_qsl
 from owslib.iso import *
 from owslib.etree import etree
@@ -16,8 +15,6 @@ import json
 import requests as req
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from geodatacrawler import GDCCONFIG
-
-fiona.supported_drivers["OGR_VRT"] = "r"
 
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
@@ -83,30 +80,32 @@ def indexFile(fname, extension):
 
     elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
         print(f"file {fname} indexed as VECTOR_FILE_TYPE")
-        with fiona.open(fname, "r") as source:
-            content['datatype'] = "vector"
-            try:
-                content['geomtype'] = source[0]['geometry']['type']
-            except Exception as e:
-                print("Failed fetching geometry type; {0}".format(e))
-                content['type'] = "table"
-            try:  # this sometimes fails, for example on csv files
-                b = source.bounds
-                content['bounds'] = [b[0],b[1],b[2],b[3]]
-                content['bounds_wgs84'] = reprojectBounds([b[0],b[1],b[2],b[3]],source.crs,4326)
-            except:
-                print('Failed reading bounds')
-            try:
-                content['crs'] = wkt2epsg(source.crs)
-            except:
-                print('Failed reading crs')
-            content['content_info'] = {"attributes":{}}    
 
-            try:
-                for k, v in source.schema['properties'].items():
-                    content['content_info']['attributes'][k] = v
-            except:
-                print('Failed reading properties')
+        tp=""
+        srs=""
+        b=""
+        attrs = {}
+        ds = ogr.Open(fname)
+        for i in ds:
+            ln = i.GetName()
+            b = i.GetExtent()
+            fc = i.GetFeatureCount()
+            srs = i.GetSpatialRef()
+            tp = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType())
+            attrs = {}
+            for f in range(i.GetLayerDefn().GetFieldCount()):
+                fld = i.GetLayerDefn().GetFieldDefn(f)
+                ftt = fld.GetTypeName()
+                # ft = fld.GetFieldTypeName(ftt)
+                fn = fld.GetName()
+                attrs[fn] = ftt
+                
+        content['content_info'] = {"attributes":attrs}
+        content['datatype'] = "vector"
+        content['geomtype'] = tp
+        content['bounds'] = [b[0],b[1],b[2],b[3]]
+        content['bounds_wgs84'] = reprojectBounds([b[0],b[1],b[2],b[3]],srs,4326)
+        content['crs'] = wkt2epsg(srs)
 
         # check if local mcf exists
         # else use mcf from a parent folder
@@ -151,20 +150,26 @@ def dict_merge(dct, merge_dct):
                 print(e,"; k:",k,"; v:",v)
 
 
-def wkt2epsg(wkt, epsg='/usr/local/share/proj/epsg', forceProj4=False):
+def wkt2epsg(crs):
+    if crs == None:
+        return ""
+    if isinstance(crs,str):
+        crs = osr.SpatialReference(crs)
     try:
-        crs = CRS.from_wkt(wkt)
-        epsg = crs.to_epsg()
+        epsg = crs.AutoIdentifyEPSG()
+        if epsg == 0:
+            epsg_id = int(crs.GetAuthorityCode(None))
+            assert epsg_id is not None
+            return epsg_id
+        else:
+            matches = crs.FindMatches()
+            for m in matches:
+                if m[1] >= 50:
+                    return wkt2epsg(m[0])
+            print("Authoritative EPSG ID could not be found")
     except Exception as e:
-        print('Invalid src (wkt) provided: ', e,'proj:', wkt)
-    if not epsg:
-        if ('GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Azimuthal_Equal_Area"],PARAMETER["latitude_of_center",5],PARAMETER["longitude_of_center",20],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH]' in wkt):
-            return "epsg:42106"
-        elif ('GEOGCS["GCS_WGS_1984_ellipse",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["Degree",0.0174532925199433]],PROJECTION["Interrupted_Goode_Homolosine"],PARAMETER["central_meridian",0],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]' in wkt):
-            return "epsg:54052"
-        print('Unable to identify: ' + wkt)
-    else:
-        return "epsg:" + str(epsg) 
+        print('Error parsing crs: ', e, str(crs))
+        return ""
 
 def isDistributionLocal(url, path):
     parsed = urlparse(url, allow_fragments=False)
@@ -175,18 +180,8 @@ def isDistributionLocal(url, path):
     else:
         return None
 
-def reprojectBounds(bnds,src,trg):
-    if src and len(src) > 0:
-        # Setup the source projection - you can also import from epsg, proj4...
-        source = osr.SpatialReference()
-        try:
-            source.ImportFromWkt(src)
-        except Exception as e:
-            print('Invalid src (wkt) provided: ', e)
-            return None
-        if not source:
-            print('Error while importing wkt from source: ', src)
-            return None
+def reprojectBounds(bnds,source,trg):
+    if source:
         target = osr.SpatialReference()
         target.ImportFromEPSG(trg)
         try:
@@ -198,7 +193,7 @@ def reprojectBounds(bnds,src,trg):
         except:
             return None
     else:
-        print('No projection info provided', src)
+        print('No projection info provided')
         return None
 
 '''
@@ -599,10 +594,11 @@ def fetchUrl(url):
         return req.get(url, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
 
 def safeFileName(n):
-    ''' remove unsafe characters from a var to make it safe'''
-
-    for i in ['(',')','[',']','{','}','&','~','%','+',',']:
-        n = n.replace(i,'')
-    for i in ['#',' ','!','+','/','\\',':',';']:
-        n = n.replace(i,'-')
-    return n
+    if n not in [None,'']:
+        ''' remove unsafe characters from a var to make it safe'''
+        for i in ['(',')','[',']','{','}','&','~','%','+',',']:
+            n = n.replace(i,'')
+        for i in ['#',' ','!','+','/','\\',':',';']:
+            n = n.replace(i,'-')
+        return n
+    return ""

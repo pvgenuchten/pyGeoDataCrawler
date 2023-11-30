@@ -2,7 +2,6 @@ from geodatacrawler.mapfile import colorCoding
 
 def test_colorCoding():
     clsstr = colorCoding(2,10,[[100,255,0],'100 255 50','#000000'])
-    print ('foo',clsstr)
     assert clsstr.find('#64ff32') > -1
     clsstr = colorCoding(2,2,['a','b'])
     assert clsstr.find("'2'") > -1

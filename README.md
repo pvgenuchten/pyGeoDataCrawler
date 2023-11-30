@@ -61,7 +61,11 @@ robot:
   skip-files: "temp.*" # do not process files matching a regexp, default: None 
 ```
 
-### Create mapfile
+### OGR/GDAL formats
+
+Some GDAL (raster) or OGR (vector) formats, such as [FileGDB](https://gdal.org/drivers/vector/openfilegdb.html), [GeoPackage](https://gdal.org/drivers/vector/gpkg.html) and [parquet](https://gdal.org/drivers/vector/parquet.html) require an additional plugin. Verify for each of the commom formats in your organisation, if the relevant GDAL plugins are installed.
+
+## Create mapfile
 
 The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A `index.yml` configuraton file is expected at the root of the folder to be indexed, if not, it will be created.
 
