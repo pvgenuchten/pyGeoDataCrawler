@@ -3,7 +3,7 @@ LAYER
     TYPE    {type}
     DATA    '{path}'
     PROJECTION
-        'init={projection}'
+        '{projection}'
     END
     EXTENT '{extent}'
     STATUS on

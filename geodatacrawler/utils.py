@@ -65,17 +65,14 @@ def indexFile(fname, extension):
         content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
 
         #which crs
-        epsg = wkt2epsg(d.GetProjection())
-        content['crs'] = epsg
+        crs = crs2code(d.GetProjection())
+        content['crs'] = crs
 
         content['content_info'] = {
                 'type': 'image',
                 'dimensions': bands,
                 'meta':  d.GetMetadata()
             }
-
-
-    
         d = None
 
     elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
@@ -105,7 +102,7 @@ def indexFile(fname, extension):
         content['geomtype'] = tp
         content['bounds'] = [b[0],b[1],b[2],b[3]]
         content['bounds_wgs84'] = reprojectBounds([b[0],b[1],b[2],b[3]],srs,4326)
-        content['crs'] = wkt2epsg(srs)
+        content['crs'] = crs2code(srs)
 
         # check if local mcf exists
         # else use mcf from a parent folder
@@ -150,7 +147,7 @@ def dict_merge(dct, merge_dct):
                 print(e,"; k:",k,"; v:",v)
 
 
-def wkt2epsg(crs):
+def crs2code(crs):
     if crs == None:
         return ""
     if isinstance(crs,str):
@@ -160,12 +157,12 @@ def wkt2epsg(crs):
         if epsg == 0:
             epsg_id = int(crs.GetAuthorityCode(None))
             assert epsg_id is not None
-            return epsg_id
+            return (crs.GetAuthorityName(None)+":"+str(epsg_id))
         else:
             matches = crs.FindMatches()
             for m in matches:
                 if m[1] >= 50:
-                    return wkt2epsg(m[0])
+                    return crs2code(m[0])
             print("Authoritative EPSG ID could not be found")
     except Exception as e:
         print('Error parsing crs: ', e, str(crs))
