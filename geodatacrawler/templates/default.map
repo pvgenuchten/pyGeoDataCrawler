@@ -7,7 +7,7 @@ MAP
     MAXSIZE 16384
     EXTENT -180 -90 180 90
     PROJECTION
-        'init=epsg:4326'
+        'epsg:4326'
     END #PROJECTION
     IMAGECOLOR 255 255 255 
     IMAGETYPE AGGA
@@ -93,7 +93,7 @@ MAP
         TYPE RASTER
         DATA 'foo'
         PROJECTION
-            "init=epsg:4326"
+            "epsg:4326"
         END
         STATUS on
     END
