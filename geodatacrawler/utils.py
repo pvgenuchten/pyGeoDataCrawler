@@ -5,7 +5,6 @@ import sys
 import pprint
 import urllib.request
 from copy import deepcopy
-from pwd import getpwuid
 from pyproj import CRS
 from osgeo import gdal, osr, ogr
 from urllib.parse import urlparse, parse_qsl
@@ -27,7 +26,6 @@ def indexFile(fname, extension):
         'title': os.path.splitext(os.path.basename(fname))[0],
         'url': fname,
         'date': getDate(fname),
-        'creator': getUser(fname),
         'size': getSize(fname)
     }
 
@@ -492,16 +490,6 @@ def getDate(fname):
     except Exception as e:
         print("WARNING: Error getting date",fname,str(e)) 
     return d
-
-def getUser(fname):
-    u = 'unknown'
-    try:
-        u = os.stat(fname).st_uid
-        u = getpwuid(u).pw_name
-    except Exception as e:
-        print("WARNING: Error getting user",fname,str(e)) 
-    return str(u)
-
 
 def parseISO(strXML, u):
     # check if a csw request

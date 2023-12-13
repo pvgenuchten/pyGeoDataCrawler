@@ -7,7 +7,10 @@ from os import path
 from copy import deepcopy
 from sqlite3 import Error
 import datetime
-from pygeometa.schemas.iso19139 import ISO19139OutputSchema
+from pygeometa.schemas.iso19139 import ISO19139OutputSchema 
+from pygeometa.schemas.stac import STACItemOutputSchema
+from pygeometa.schemas.ogcapi_records import OGCAPIRecordOutputSchema
+from pygeometa.schemas.dcat import DCATOutputSchema
 from pygeometa.core import read_mcf, render_j2_template
 from geodatacrawler.utils import indexFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName
 from geodatacrawler import GDCCONFIG
@@ -36,7 +39,7 @@ schemaPath = os.getenv('pgdc_schema_path') or os.path.join(os.path.dirname(__fil
 @click.option('--dir-out-mode', nargs=1, required=False, help="nested|flat indicates if files in output folder are nested")
 @click.option('--mode', nargs=1, required=False, help="metadata mode init [update] [export] [import-csv]") 
 @click.option('--dbtype', nargs=1, required=False, help="export db type path [sqlite] [postgres]")  
-@click.option('--profile', nargs=1, required=False, help="export to profile iso19139 [dcat]")   
+@click.option('--profile', nargs=1, required=False, help="export to profile iso19139 [dcat] [stac] [oarec-record]")   
 @click.option('--db', nargs=1, required=False, help="a db to export to")           
 @click.option('--map', nargs=1, required=False, help="a mappingfile for csv")
 @click.option('--resolve', nargs=1, required=False, help="Resolve remote URI's to fetch remote metadata, default:False")
@@ -60,14 +63,15 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve
         dir_out_mode = "nested"
     if not mode:
         mode = "init"
-    elif  mode not in ["init","update","export","import-csv"]:
+    elif mode not in ["init","update","export","import-csv"]:
         print('valid modes are init, update, export, import-csv')
         exit()
     if not dbtype or dbtype not in ["path","sqlite","postgres"]:
         dbtype = "path"
     if not db:
-        db = dir   
-    if not profile or profile not in ["iso19139","dcat"]:
+        db = dir
+    if mode=='export' and (not profile or profile not in ["iso19139","dcat","stac","oarec-record"]):
+        print("Profile " + (profile or '-') + " not available, using iso19139")
         profile = "iso19139"    
     print(mode + ' metadata in ' + dir + ' to ' + dir_out)
 
@@ -88,9 +92,9 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve
     if mode=='import-csv':
         importCsv(dir, dir_out, map, sep, cluster, prefix)
     else:
-        processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir, resolve, prefix)
+        processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir, resolve, prefix, profile)
 
-def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode, root, resolve, prefix):
+def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode, root, resolve, prefix, profile):
     
     coreMetadata = merge_folder_metadata(parentMetadata, target_path, mode) 
 
@@ -108,7 +112,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 print('Skip path: '+ str(file))
             else:
                 print('Process path: '+ str(file))
-                processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root, resolve, prefix)
+                processPath(str(file), deepcopy(coreMetadata), mode, dbtype, dir_out, dir_out_mode, root, resolve, prefix, profile)
         else:
             # process the file
             fname = str(file)
@@ -155,8 +159,21 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 md = read_mcf(target)
                                 #yaml to iso/dcat
                                 #print('md2xml',md)
-                                if schemaPath and os.path.exists(schemaPath):
-                                    xml_string = render_j2_template(md, template_dir="{}/iso19139".format(schemaPath))   
+                                fext="xml"
+                                if schemaPath and os.path.exists(schemaPath) and os.path.exists(os.path.join(schemaPath,profile)):
+                                    xml_string = render_j2_template(md, template_dir=os.path.join(schemaPath,profile))   
+                                elif (profile == 'stac'):
+                                    stac_os = STACItemOutputSchema()
+                                    xml_string = stac_os.write(md)
+                                    fext="json"
+                                elif (profile == 'oarec-record'):
+                                    oarec_os = OGCAPIRecordOutputSchema()
+                                    xml_string = oarec_os.write(md)
+                                    fext="json"
+                                elif (profile == 'dcat'):
+                                    dcat_os = DCATOutputSchema()
+                                    xml_string = dcat_os.write(md)
+                                    fext="json"
                                 else:
                                     iso_os = ISO19139OutputSchema()
                                     xml_string = iso_os.write(md)
@@ -164,14 +181,14 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     insert_or_update(target, dir_out)
                                 elif dbtype == "path":
                                     if dir_out_mode == "flat":
-                                        pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.xml')
+                                        pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.'+fext)
                                     else:
-                                        pth = os.path.join(target_path,safeFileName(md['metadata']['identifier'])+'.xml')
+                                        pth = os.path.join(target_path,safeFileName(md['metadata']['identifier'])+'.'+fext)
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
-                                        print('iso19139 xml generated at '+pth)    
+                                        print(profile + ' generated at ' + pth)    
                         except Exception as e:
-                            print('Failed to create xml:',os.path.join(target_path,base+'.xml'),e,traceback.format_exc())
+                            print('Failed to create metadata:',os.path.join(target_path,base+'.xml',profile),e,traceback.format_exc())
                     elif mode=='update':
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:
@@ -274,7 +291,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                             'identification': {
                                                                 'title': l.get('name',''),
                                                                 'abstract': l.get('abstract',''),
-                                                                'keywords': l.get('keywords',[]),
+                                                                'keywords': l.get('keywords',{}),
                                                                 'extents': {'spatial': [l['extent']]},
                                                                 'rights': owsCapabs.get('accessconstraints',''),
                                                                 'fees': owsCapabs.get('fees','')
@@ -510,7 +527,7 @@ def asPGM(dct,fname):
             exp['contact'][safeFileName(c)] = {'email': c, 'role':'creator'}
         else:
             exp['contact'][safeFileName(c)] = {'individualname': c, 'role':'creator'}
-    exp['identification']['keywords'] = {'default': {'keywords': (dct.get('keywords','').split(',') + dct.get('subject','').split(',') + dct.get('category','').split(','))}}
+    exp['identification']['keywords'] = {'default': {'keywords': [k for k in (dct.get('keywords','').split(',') + dct.get('subject','').split(',') + dct.get('category','').split(',')) if k]}}
     exp['spatial']['datatype'] = dct.get('datatype','')
     exp['spatial']['geomtype'] = dct.get('geomtype','')
     exp['identification']['status'] = dct.get('contentStatus','' )
