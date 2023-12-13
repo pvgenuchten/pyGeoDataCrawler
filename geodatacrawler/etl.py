@@ -5,5 +5,5 @@ import yaml
 from geodatacrawler.utils import indexFile
 from geodatacrawler import GDCCONFIG
 
-def etl(dir)
+def etl(dir):
     print("Running etl on dir " + dir)
