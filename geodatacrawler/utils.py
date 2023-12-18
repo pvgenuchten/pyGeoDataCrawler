@@ -94,12 +94,13 @@ def indexFile(fname, extension):
                 # ft = fld.GetFieldTypeName(ftt)
                 fn = fld.GetName()
                 attrs[fn] = ftt
-                
         content['content_info'] = {"attributes":attrs}
         content['datatype'] = "vector"
         content['geomtype'] = tp
-        content['bounds'] = [b[0],b[1],b[2],b[3]]
-        content['bounds_wgs84'] = reprojectBounds([b[0],b[1],b[2],b[3]],srs,4326)
+        # change axis order
+        content['bounds'] = [b[0],b[2],b[1],b[3]]
+        content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
+        print('ff',content['bounds_wgs84'])
         content['crs'] = crs2code(srs)
 
         # check if local mcf exists
@@ -159,9 +160,10 @@ def crs2code(crs):
         else:
             matches = crs.FindMatches()
             for m in matches:
+                print('match:',crs2code(m[0]),m[1],'%')
                 if m[1] >= 50:
                     return crs2code(m[0])
-            print("Authoritative EPSG ID could not be found")
+            print("Authoritative EPSG ID could not be found for " + str(crs))
     except Exception as e:
         print('Error parsing crs: ', e, str(crs))
         return ""
