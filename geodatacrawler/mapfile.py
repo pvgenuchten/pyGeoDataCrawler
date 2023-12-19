@@ -49,7 +49,7 @@ def mapForDir(dir, dir_out, dir_out_mode, recursive):
     config['mdLinkTypes'] = os.getenv('pgdc_md_link_types') or ['OGC:WMS','OGC:WFS','OGC:WCS']
     # default styling
     config['map'] = {"styles":[{"classes":"#56a1b3,#80bfab,#abdda4,#c7e8ad,#e3f4b6,#ffffbf,#fee4a0,#fec980,#fdae61,#f07c4a,#e44b33,#d7191c".split(',')}]}
-
+    config['map']['extent'] = [None,None,None,None]
     initialMetadata['robot'] = config
 
     processPath("", initialMetadata, dir_out, dir_out_mode, recursive)
@@ -169,6 +169,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                         # else cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('bbox')
                                         if not 'bounds' in fileinfo.keys():
                                             fileinfo['bounds'] = [-180,-90,180,90]
+                                        else:
+                                            print('zz',fileinfo['bounds_wgs84'])
+                                            updateBounds(fileinfo['bounds_wgs84'], config)
                                         
                                         # first take override value from index.yml, else take value from file, else 4326
                                         # else cnt['crs'] = cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('crs')
@@ -247,7 +250,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
         if not os.path.exists(do):
             print('create folder',do)
             os.makedirs(do)
-            
+
+        mf['extent'] = " ".join(str(x) for x in config['map']['extent'])
+
         print(f'writing mapfile {mapfile}')
         mappyfile.save(mf, mapfile, 
             indent=4, spacer=' ', quote='"', newlinechar='\n',
@@ -358,4 +363,14 @@ def hexcolor(clr):
     else: 
         return clr
 
+def updateBounds(bb,config):
+    if bb and len(bb) > 3:
+        if not config['map']['extent'][0] or float(bb[0]) < config['map']['extent'][0]:
+            config['map']['extent'][0] = float(bb[0])
+        if not config['map']['extent'][1] or float(bb[1]) < config['map']['extent'][1]:
+            config['map']['extent'][1] = float(bb[1])
+        if not config['map']['extent'][2] or float(bb[2]) > config['map']['extent'][2]:
+            config['map']['extent'][2] = float(bb[2])
+        if not config['map']['extent'][3] or float(bb[3]) > config['map']['extent'][3]:
+            config['map']['extent'][3] = float(bb[3])
 

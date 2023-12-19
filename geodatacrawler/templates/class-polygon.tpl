@@ -2,8 +2,8 @@
 CLASS
     NAME "style"
     STYLE
-        COLOR 100 100 100
-        SIZE 8
-        WIDTH 1
+        COLOR "#c5c0ca"
+        OUTLINECOLOR "#30123b"
+        OUTLINEWIDTH 0.1
     END
 END
