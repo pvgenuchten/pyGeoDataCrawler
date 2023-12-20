@@ -170,14 +170,22 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                         if not 'bounds' in fileinfo.keys():
                                             fileinfo['bounds'] = [-180,-90,180,90]
                                         else:
-                                            print('zz',fileinfo['bounds_wgs84'])
-                                            updateBounds(fileinfo['bounds_wgs84'], config)
+                                            updateBounds(fileinfo['bounds_wgs84'], config['map']['extent'])
                                         
-                                        # first take override value from index.yml, else take value from file, else 4326
+                                        # default val from index.yml
+                                        projections = ly.get('projections', 'epsg:4326 epsg:3857');
+                                        # first take value from file, take srs-str, else take override value from index.yml, else  4326
                                         # else cnt['crs'] = cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('crs')
-                                        fileinfo['crs'] = ly.get('crs',fileinfo.get('crs'))
-                                        if fileinfo.get('crs') in [None,'']:
-                                            fileinfo['crs'] = "epsg:4326"
+                                        if fileinfo.get('crs') not in [None,'']:
+                                            projections = fileinfo.get('crs') + ' ' + projections
+                                            projection = fileinfo.get('crs')
+                                        elif fileinfo.get('crs-str') not in [None,'']:
+                                            projection = fileinfo.get('crs-str')
+                                        elif ly.get('crs') not in [None,'']:
+                                            projections = ly.get('crs') + ' ' + projections
+                                            projection = ly.get('crs')
+                                        else: 
+                                            projection = 'epsg:4326'
 
                                         # evaluate if a custom style is defined
                                         band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0]
@@ -202,14 +210,16 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
                                         new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
 
+
+
                                         strLr = new_layer_string.format(name=fb,
                                                     title='"'+cnt.get('identification',{}).get('title', '')+'"',
                                                     abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
                                                     type=fileinfo['type'],
                                                     path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
                                                     template=ly.get('template', 'info.html'),
-                                                    projection=fileinfo['crs'],
-                                                    projections=ly.get('projections', 'epsg:4326 epsg:3857'),
+                                                    projection=projection,
+                                                    projections=projections,
                                                     extent=" ".join(map(str,fileinfo['bounds'])),
                                                     id="fid", # todo, use field from attributes, config?
                                                     mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
@@ -255,7 +265,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
         print(f'writing mapfile {mapfile}')
         mappyfile.save(mf, mapfile, 
-            indent=4, spacer=' ', quote='"', newlinechar='\n',
+            indent=4, spacer=' ', quote="'", newlinechar='\n',
             end_comment=False, align_values=False)
     else:
         print('Folder ' + os.path.join(config['rootDir'],relPath) + ' empty, skip creation')
@@ -363,14 +373,17 @@ def hexcolor(clr):
     else: 
         return clr
 
-def updateBounds(bb,config):
-    if bb and len(bb) > 3:
-        if not config['map']['extent'][0] or float(bb[0]) < config['map']['extent'][0]:
-            config['map']['extent'][0] = float(bb[0])
-        if not config['map']['extent'][1] or float(bb[1]) < config['map']['extent'][1]:
-            config['map']['extent'][1] = float(bb[1])
-        if not config['map']['extent'][2] or float(bb[2]) > config['map']['extent'][2]:
-            config['map']['extent'][2] = float(bb[2])
-        if not config['map']['extent'][3] or float(bb[3]) > config['map']['extent'][3]:
-            config['map']['extent'][3] = float(bb[3])
+'''
+Extent a targetbox (tb) with a source box (sb)
+'''
+def updateBounds(sb,tb):
+    if sb and len(sb) > 3:
+        if not tb[0] or float(sb[0]) < tb[0]:
+            tb[0] = float(sb[0])
+        if not tb[1] or float(sb[1]) < tb[1]:
+            tb[1] = float(sb[1])
+        if not tb[2] or float(sb[2]) > tb[2]:
+            tb[2] = float(sb[2])
+        if not tb[3] or float(sb[3]) > tb[3]:
+            tb[3] = float(sb[3])
 

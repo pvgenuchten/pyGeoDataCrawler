@@ -1,4 +1,6 @@
 from geodatacrawler.mapfile import colorCoding
+from geodatacrawler.utils import indexFile, reprojectBounds
+from osgeo import osr
 
 def test_colorCoding():
     clsstr = colorCoding(2,10,[[100,255,0],'100 255 50','#000000'])
@@ -20,3 +22,8 @@ def test_colorCoding():
             { 'val': 0,'label': 'false','color': '#56a1b3'},
             { 'val': 1,'label': 'true', 'color': '#80bfab'}],"name":"foo"})
     assert clsstr.find('56a1b3') > -1
+
+def test_proj():
+        f = indexFile("./demo/maize.tif","tif")
+        foo = reprojectBounds([1537886.2528828776, -1063208.0434537493, 2424636.2528828774, 88791.95654625073], osr.SpatialReference(f['crs-str']), 4326)
+        assert foo[0]==168.48720712208527 

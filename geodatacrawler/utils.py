@@ -60,9 +60,9 @@ def indexFile(fname, extension):
             })
 
         content['bounds'] = [ulx, lry, lrx, uly]
-        content['bounds_wgs84'] = reprojectBounds([ulx, lry, lrx, uly],d.GetProjection(),4326)
-
+        content['bounds_wgs84'] = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
         #which crs
+        content['crs-str'] = str(d.GetProjection())
         crs = crs2code(d.GetProjection())
         content['crs'] = crs
 
@@ -100,7 +100,8 @@ def indexFile(fname, extension):
         # change axis order
         content['bounds'] = [b[0],b[2],b[1],b[3]]
         content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
-        print('ff',content['bounds_wgs84'])
+        
+        content['crs-str'] = str(srs)
         content['crs'] = crs2code(srs)
 
         # check if local mcf exists
@@ -160,10 +161,12 @@ def crs2code(crs):
         else:
             matches = crs.FindMatches()
             for m in matches:
-                print('match:',crs2code(m[0]),m[1],'%')
                 if m[1] >= 50:
                     return crs2code(m[0])
-            print("Authoritative EPSG ID could not be found for " + str(crs))
+                else:
+                    print('No match:',crs2code(m[0]),m[1],'%')
+            # Authoritative EPSG ID could not be found, return crs-str
+            return ""
     except Exception as e:
         print('Error parsing crs: ', e, str(crs))
         return ""
@@ -178,16 +181,18 @@ def isDistributionLocal(url, path):
         return None
 
 def reprojectBounds(bnds,source,trg):
+    
     if source:
         target = osr.SpatialReference()
         target.ImportFromEPSG(trg)
         try:
             target.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
             transform = osr.CoordinateTransformation(source, target)
-            lr = transform.TransformPoint(bnds[0],bnds[1])
-            ul = transform.TransformPoint(bnds[2],bnds[3])
+            lr = transform.TransformPoint(float(bnds[0]),float(bnds[1]))
+            ul = transform.TransformPoint(float(bnds[2]),float(bnds[3]))
             return [lr[0],lr[1],ul[0],ul[1]]
-        except:
+        except Exception as e:
+            print(f"reproject failed ; {str(e)}")
             return None
     else:
         print('No projection info provided')
