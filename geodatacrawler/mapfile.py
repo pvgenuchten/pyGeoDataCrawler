@@ -196,8 +196,11 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                             if fileinfo['type']=='raster': # set colors for range, only first band supported
                                                 new_class_string2 += colorCoding(band1.get('min',0), band1.get('max',0),style_reference)
                                             else: # vector
-                                                new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
-                                        
+                                                # case config
+                                                    
+                                                # else case default
+                                                    new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
+                                       
  
                                             # stylefile = os.path.join(config['rootDir'],relPath,style_reference)
                                             # if os.path.exists(stylefile):
@@ -302,6 +305,31 @@ def addLink(type, layer, file, relPath, map, config):
         yaml.dump(orig, f, sort_keys=False)
 
 '''
+if val is str, quote it in expressions
+'''
+def quoteStr(v):
+    if isinstance(v,str): # todo: if '5' is a str, but should be considered int 5
+        return f'"{v}"'
+    else:
+        return v
+
+'''
+codes a ms classes element
+
+'''
+def msStyler(geomtype,color):
+    if geomtype=='raster':
+        return f"COLOR '{hexcolor(color)}'"
+    elif geomtype=='point':
+      return f'SYMBOL "circle"\nCOLOR "{hexcolor(color)}"\nSIZE 5\nOUTLINECOLOR "#232323"\nOUTLINEWIDTH 0.1'
+    elif geomtype=='polyline':
+        return f'WIDTH 0.1\nCOLOR "{hexcolor(color)}"\nLINEJOIN "bevel"'
+    elif geomtype=='polygon':
+        return f'COLOR "{hexcolor(color)}"\nOUTLINECOLOR "#232323"\nOUTLINEWIDTH 0.1'
+    else:
+        print(f'unknown type when building class element: {geomtype}')
+
+'''
 sets a color coding for a layer
 3 style configuration options:
     styles:
@@ -317,7 +345,12 @@ sets a color coding for a layer
             { val: 0,label: 'false',color: '#56a1b3'},
             { val: 1,label: 'true', color: '#80bfab'}]
 '''
-def colorCoding(min,max,style):
+def colorCoding(geomtype,min,max,style):
+
+    if geomtype=='raster':
+        fld = 'pixel'
+    else: #vector
+        fld = style.get('fld')
 
     if isinstance(style,str): # case string (mapfile syntax)
         return style
@@ -326,8 +359,10 @@ def colorCoding(min,max,style):
     elif isinstance(style,dict): # 3 cases: array of color, array of ranges, array of absolutes
         classes = style.get('classes',['#ff0000','#ffff00','#00ff00','#00ffff','#0000ff'])
         clsstr = ""
+        # test is classes is string -> array
         if isinstance(classes,str):
             classes = classes.split(',')
+        # a list of classes
         if isinstance(classes[0],str) or isinstance(classes[0],list):
             getcontext().prec = 4 # set precision of decimals, so classes are not too specific
             rng = Decimal(max - min)
@@ -335,23 +370,23 @@ def colorCoding(min,max,style):
                 sgmt =  Decimal(rng/len(classes))
                 cur =  Decimal(min)
                 for cls in classes:
-                    clsstr += f"CLASS\nNAME '{cur} - {cur+sgmt}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [pixel] >= {cur} AND [pixel] <= {cur+sgmt} )\nSTYLE\nCOLOR '{hexcolor(cls)}'\nEND\nEND\n\n"
+                    clsstr += f"CLASS\nNAME '{cur} - {cur+sgmt}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [{fld}] >= {cur} AND [{fld}] <= {cur+sgmt} )\nSTYLE\n{msStyler(geomtype,cls)}\nEND\nEND\n\n"
                     cur += sgmt
                 return clsstr
-            elif rng == 0:
-                return f"CLASS\nNAME '{min}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [pixel] = {min} )\nSTYLE\nCOLOR '{hexcolor(classes[0])}'\nEND\nEND\n\n"
+            elif rng == 0: # single value grid?
+                return f"CLASS\nNAME '{min}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [{fld}] = {min} )\nSTYLE\n{msStyler(geomtype,classes[0])}\nEND\nEND\n\n"
             else:
-                print('error',min,max,rng)
+                print('Can not derive classes, negative range',min,max,rng)
                 return ""
         elif isinstance(classes[0],dict):
             for cls in classes:
                 clr = hexcolor(cls.get('color','#999999'))
                 if 'val' in cls.keys():
                     lbl = cls.get('label',str(cls['val']))
-                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [pixel] = {cls['val']} )\nSTYLE\nCOLOR \"{clr}\"\nEND\nEND\n\n"
+                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [{fld}] = {quoteStr(cls['val'])} )\nSTYLE\n{msStyler(geomtype,clr)}\nEND\nEND\n\n"
                 elif 'min' in cls.keys() and 'max' in cls.keys():
                     lbl = cls.get('label',(str(cls['min'])+' - '+str(cls['max'])))
-                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [pixel] >= {cls['min']} AND [pixel] <= {cls['max']} )\nSTYLE\nCOLOR \"{clr}\"\nEND\nEND\n\n"
+                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [{fld}] >= {cls['min']} AND [{fld}] <= {cls['max']} )\n{msStyler(geomtype,clr)}\nEND\nEND\n\n"
             return clsstr
         else:
             print('type '+ str(type(classes[0])) +' not recognised for class') 
