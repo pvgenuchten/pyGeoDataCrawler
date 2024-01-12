@@ -199,10 +199,33 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                             orig = {}
                         if 'distribution' not in orig or orig['distribution'] is None: 
                             orig['distribution'] = {}
-                        # find the relevant related file (introduced by init)
+                        # find the relevant related file (introduced by init), first in distributions, then by any extension
                         dataFN = orig.get('distribution').get('local',{}).get('url','').split('/').pop()
-                        if (dataFN not in [None,''] and os.path.exists(os.path.join(target_path,dataFN))):
-                            cnt = indexFile(os.path.join(target_path,dataFN), dataFN.split('.').pop()) 
+                        
+                        # evaluate if a file is attached, or is only a metadata (of a wms for example)
+                        hasFile = None
+                        dataFile = None
+                        if (dataFN not in [None,'']):
+                            if (os.path.exists(os.path.join(target_path,dataFN))):
+                                dataFile = os.path.join(target_path,dataFN)
+                                hasFile = True
+                            else:
+                                print(f"Distribution.local references a non existing file {os.path.join(target_path,dataFN)}")
+                                
+                        if not hasFile: # check if a indexable file with same name exists (what about case sensitivity?)
+                            for ext in GDCCONFIG["INDEX_FILE_TYPES"]:
+                                if (os.path.exists(str(file).replace('yml',ext))):
+                                    dataFile = str(file).replace('yml',ext)
+                                    orig['distribution']['local'] = {
+                                        "url": str(file).replace('yml',ext),
+                                        "name": str(file).replace('.yml','').replace("_"," "),
+                                        "type": ext 
+                                    }
+                                    hasFile = True
+                                    break
+
+                        if (hasFile):
+                            cnt = indexFile(dataFile, dataFile.split('.').pop()) 
                             if 'metadata' not in orig or orig['metadata'] is None: 
                                 orig['metadata'] = {}
                             orig['metadata'] = orig.get('metadata',{})
@@ -218,9 +241,10 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 crs = cnt.get('crs','4326')
                             orig['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
                             orig['content_info'] = cnt.get('content_info',{})
+
+
                         
-                        # evaluate if a file is attached, or is only a metadata (of a wms for example)
-                        hasFile = None
+                        
 
                         skipOWS = False # not needed if this is fetched from remote
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata

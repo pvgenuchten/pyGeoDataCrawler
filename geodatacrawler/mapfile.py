@@ -72,7 +72,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
     lyrs = mf['layers']
 
     # set up header
-    mf["name"] = list(filter(None, str(config['rootDir'] + os.sep + relPath).split(os.sep))).pop()
+    mf["name"] = list(filter(None, str(os.path.abspath(config['rootDir']) + os.sep + relPath).split(os.sep))).pop()
 
     mf["web"]["metadata"]["ows_title"] = coreMetadata.get('identification').get("title", mf["name"])
     mf["web"]["metadata"]["ows_abstract"] = coreMetadata.get('identification').get("abstract", "")
