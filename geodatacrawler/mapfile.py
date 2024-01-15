@@ -148,13 +148,14 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 parsed = urlparse(v.get('url',''))
                                 fn = str(parsed.path).split('/').pop()
                                 sf = os.path.join(config['rootDir'], relPath , fn)
+                                if v['type'] in [None,'']:
+                                    v['type'] = "unknown"
                                 if not v.get('type','').startswith('OGC:') and os.path.exists(sf):
                                     print('processing file' + sf)
                                     fb,e = str(fn).rsplit('.', 1)
                                     if e and e.lower() in GDCCONFIG["SPATIAL_FILE_TYPES"]:
                                     # we better index the file again... to get band info etc
                                         fileinfo = indexFile(sf, e)
-
                                         if (fileinfo.get('datatype','').lower() == "raster"):
                                             fileinfo['type'] = 'raster'
                                         elif (fileinfo.get('geomtype','').lower() in ["linestring", "line", "multiline", "polyline", "wkblinestring"]):
@@ -189,27 +190,52 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
                                         # evaluate if a custom style is defined
                                         band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0]
-                                        new_class_string2 = 'PROCESSING "NODATA=' + str(band1.get('nodata', 32768)) + '"\n'
-                                        for style_reference in ly.get("styles", []): 
-                                            
-                                            new_class_string2 += f"CLASSGROUP \"{style_reference.get('name','Default')}\"\n"
-                                            if fileinfo['type']=='raster': # set colors for range, only first band supported
-                                                new_class_string2 += colorCoding(band1.get('min',0), band1.get('max',0),style_reference)
-                                            else: # vector
-                                                new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
+                                        new_class_string2 = ""
                                         
- 
-                                            # stylefile = os.path.join(config['rootDir'],relPath,style_reference)
-                                            # if os.path.exists(stylefile):
-                                            #     with open(stylefile) as f1:
-                                            #         new_class_string2 = f1.read()
-                                            #         print("Failed opening '{0}', use default style for '{1}'".format(ly.get("style", ""), fileinfo['type']))
-                                            # else:
-                                            #     print(f'Stylefile {stylefile} does not exist')
-                                            #     new_class_string2 = ""
+                                        if 'styles' in ly.keys() and isinstance(ly['styles'],list):
+                                            for style_reference in ly.get("styles", []): 
+                                                # if isinstance(style_reference,dict): 
+                                                #    new_class_string2 += f"CLASSGROUP \"{style_reference.get('name','Default')}\"\n"
+                                                if isinstance(style_reference,str): # case string (mapfile syntax)
+                                                    stylefile = os.path.join(config['rootDir'],relPath,style_reference)
+                                                    if os.path.exists(stylefile):
+                                                        with open(stylefile) as f1:
+                                                            new_class_string2 += f1.read()
+                                                    else:
+                                                        print(f'Stylefile {stylefile} does not exist')
+                                                
+                                                elif fileinfo['type']=='raster': # set colors for range, only first band supported
+                                                    new_class_string2 += colorCoding('raster',band1.get('min',0), band1.get('max',0),style_reference)
+                                                else: # vector
+                                                    new_class_string2 += colorCoding(fileinfo['type'],None,None,style_reference)
+                                        else:
+                                            print(f'styles defined for layer {fn}, but not type list')
+                                           
+                                        if new_class_string2 == "":
+                                            new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
+
+                                        if 'template' not in ly.keys() or ly['template'] != '': # custom template
+                                            if fileinfo['type']=='raster':
+                                                ly['template'] = 'grid.html'
+                                                if not os.path.exists(os.path.join('' if dir_out_mode == 'nested' else relPath,'grid.html')):
+                                                    gridinfofile = pkg_resources.read_text(templates, 'grid.html')
+                                                    with open(os.path.join('' if dir_out_mode == 'nested' else relPath,'grid.html'), 'w') as f:
+                                                       f.write(gridinfofile) 
+                                            else:
+                                                ly['template'] = ly.get('template', f'{fb}.html')
+                                                vectorinfofile = "<!-- MapServer Template -->\n"
+                                                for attr in fileinfo.get('content_info',{}).get('attributes',{}).keys():
+                                                    vectorinfofile += f"{attr}: [{attr}]<br/>"
+                                                vectorinfofile += "<hr/>"
+                                                with open(os.path.join('' if dir_out_mode == 'nested' else relPath,fb+'.html'), 'w') as f:
+                                                    f.write(vectorinfofile) 
+
+                                        # prepend nodata on grids
+                                        if fileinfo['type']=='raster':
+                                            new_class_string2 = 'PROCESSING "NODATA=' + str(band1.get('nodata', 32768)) + '"\n' + new_class_string2
+
 
                                         new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
-
 
 
                                         strLr = new_layer_string.format(name=fb,
@@ -217,7 +243,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                                     abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
                                                     type=fileinfo['type'],
                                                     path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
-                                                    template=ly.get('template', 'info.html'),
+                                                    template=ly.get('template'),
                                                     projection=projection,
                                                     projections=projections,
                                                     extent=" ".join(map(str,fileinfo['bounds'])),
@@ -317,41 +343,60 @@ sets a color coding for a layer
             { val: 0,label: 'false',color: '#56a1b3'},
             { val: 1,label: 'true', color: '#80bfab'}]
 '''
-def colorCoding(min,max,style):
+def colorCoding(geomtype,min,max,style):
 
-    if isinstance(style,str): # case string (mapfile syntax)
-        return style
+    if geomtype=='raster':
+        prop = 'pixel'
+    else: #vector
+        prop = style.get('property')
+        if prop in [None,'']:
+            if 'classes' in style and len(style['classes']) > 0: # have single color style
+                lbl = 'default'
+                if isinstance(style['classes'][0],dict):
+                    lbl = style['classes'][0].get('label',style.get('name','default'))
+                return f"CLASS\nNAME '{lbl}'\nSTYLE\n{msStyler(geomtype,style['classes'][0])}\nEND\nEND\n\n"
+            else:     
+                return "" # No property for expression, use default color, 
+
     if isinstance(style,list):
-        return colorCoding(min,max,{"classes":style}) # backwards compat
+        return colorCoding(geomtype,min,max,{"classes":style}) # backwards compat
     elif isinstance(style,dict): # 3 cases: array of color, array of ranges, array of absolutes
-        classes = style.get('classes',['#ff0000','#ffff00','#00ff00','#00ffff','#0000ff'])
+        print('yoo')
+        classes = style.get('classes','#ff0000,#ffff00,#00ff00,#00ffff,#0000ff')
         clsstr = ""
+        # test is classes is string -> array
         if isinstance(classes,str):
             classes = classes.split(',')
-        if isinstance(classes[0],str) or isinstance(classes[0],list):
+        # a list of classes
+        if isinstance(classes[0],str) or isinstance(classes[0],list): # list may be a color [255 255 0]
+            print('foo')
             getcontext().prec = 4 # set precision of decimals, so classes are not too specific
-            rng = Decimal(max - min)
+            if min in [None,''] or max in [None,'']: # for vector max-min currently None, todo: can fetch from data
+                rng = 0
+            else:
+                rng = Decimal(max - min)
+            print('roo',rng)
             if rng > 0:
                 sgmt =  Decimal(rng/len(classes))
                 cur =  Decimal(min)
                 for cls in classes:
-                    clsstr += f"CLASS\nNAME '{cur} - {cur+sgmt}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [pixel] >= {cur} AND [pixel] <= {cur+sgmt} )\nSTYLE\nCOLOR '{hexcolor(cls)}'\nEND\nEND\n\n"
+                    clsstr += f"CLASS\nNAME '{cur} - {cur+sgmt}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [{prop}] >= {cur} AND [{prop}] <= {cur+sgmt} )\nSTYLE\n{msStyler(geomtype,cls)}\nEND\nEND\n\n"
                     cur += sgmt
                 return clsstr
-            elif rng == 0:
-                return f"CLASS\nNAME '{min}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [pixel] = {min} )\nSTYLE\nCOLOR '{hexcolor(classes[0])}'\nEND\nEND\n\n"
+            elif rng == 0: # single value grid?
+                return f"CLASS\nNAME '{min}'\nGROUP '{style.get('name','Default')}'\nEXPRESSION ( [{prop}] = {min} )\nSTYLE\n{msStyler(geomtype,classes[0])}\nEND\nEND\n\n"
             else:
-                print('error',min,max,rng)
+                print('Can not derive classes, negative range',min,max,rng)
                 return ""
         elif isinstance(classes[0],dict):
+            print('loo')
             for cls in classes:
-                clr = hexcolor(cls.get('color','#999999'))
-                if 'val' in cls.keys():
+                if 'val' in cls.keys() and cls['val'] not in [None]:
                     lbl = cls.get('label',str(cls['val']))
-                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [pixel] = {cls['val']} )\nSTYLE\nCOLOR \"{clr}\"\nEND\nEND\n\n"
+                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [{prop}] = {quoteStr(cls['val'])} )\nSTYLE\n{msStyler(geomtype,cls)}\nEND\nEND\n\n"
                 elif 'min' in cls.keys() and 'max' in cls.keys():
                     lbl = cls.get('label',(str(cls['min'])+' - '+str(cls['max'])))
-                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [pixel] >= {cls['min']} AND [pixel] <= {cls['max']} )\nSTYLE\nCOLOR \"{clr}\"\nEND\nEND\n\n"
+                    clsstr += f"CLASS\nNAME \"{lbl}\"\nGROUP \"{style.get('name','Default')}\"\nEXPRESSION ( [{prop}] >= {cls['min']} AND [{prop}] <= {cls['max']} )\nSTYLE\n{msStyler(geomtype,cls)}\nEND\nEND\n\n"
             return clsstr
         else:
             print('type '+ str(type(classes[0])) +' not recognised for class') 
@@ -360,6 +405,30 @@ def colorCoding(min,max,style):
         print('type '+ str(type(style)) +' not recognised for style') 
         return ""
     
+
+'''
+codes a ms classes element
+'''
+def msStyler(geomtype,cls):
+    if isinstance(cls,str) or isinstance(cls,list):
+        cls = {'color': cls}
+    color = hexcolor(cls.get('color','#eeeeee'))
+    linecolor = hexcolor(cls.get('linecolor','#232323'))
+    symbol = cls.get('symbol','circle')
+    size = float(cls.get('size') or 5) 
+    width = float(cls.get('width') or 0.1)
+    if geomtype=='raster':
+        return f'COLOR "{color}"\n'
+    elif geomtype=='point':
+      return f'SYMBOL "{symbol}"\nCOLOR "{color}"\nSIZE {str(size)}\nOUTLINECOLOR "{linecolor}"\nOUTLINEWIDTH 0.1\n'
+    elif geomtype=='polyline':
+        return f'WIDTH {str(width)}\nCOLOR "{color}"\nLINEJOIN "bevel"\n'
+    elif geomtype=='polygon':
+        return f'COLOR "{color}"\nOUTLINECOLOR "{linecolor}"\nOUTLINEWIDTH {str(width)}\n'
+    else:
+        print(f'unknown type when building class element: {geomtype}')
+
+
 '''
 if color is rgb, return as hex
 '''
@@ -387,3 +456,11 @@ def updateBounds(sb,tb):
         if not tb[3] or float(sb[3]) > tb[3]:
             tb[3] = float(sb[3])
 
+'''
+if val is str, quote it in expressions
+'''
+def quoteStr(v):
+    if isinstance(v,str): # todo: if '5' is a str, but should be considered int 5
+        return f'"{v}"'
+    else:
+        return v
