@@ -1,4 +1,5 @@
 from logging import NullHandler
+from unidecode import unidecode
 import os
 import time
 import sys
@@ -439,7 +440,7 @@ def fetchMetadata(u):
             if (restype == 'application/json'):
                 md = parseDataCite(resp.text,u)
                 # datapackage, stac, ogcapi-records, etc....   
-            elif (restype == 'application/xml' or restype == 'text/xml'):
+            elif ('application/xml' in restype or 'text/xml' in restype):
                 # datacite can also be in xml
                 md = parseISO(resp.text,u)
             else:
@@ -504,7 +505,7 @@ def parseISO(strXML, u):
         try:
             doc = etree.fromstring(strXML)
         except ValueError:
-            print('initial parse failed')
+            print(f'iso19139 parse failed {u}')
             doc = etree.fromstring(bytes(strXML, 'utf-8'))
         nsmap = {}
         for ns in doc.xpath('//namespace::*'):
@@ -592,5 +593,5 @@ def safeFileName(n):
             n = n.replace(i,'')
         for i in ['#',' ','!','+','/','\\',':',';']:
             n = n.replace(i,'-')
-        return n
+        return unidecode(n)
     return ""

@@ -259,10 +259,14 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         skipFinalWrite = False
                         if not skipOWS and resolve:
                             for d,v in orig.get('distribution',{}).items():
-                                if (v.get('url','') not in [None,""] 
-                                    and (v.get('type','').upper().startswith('OGC:') 
-                                    or v.get('type','').upper() in ['WMS','WFS','WCS','WMTS'])
-                                    and v['url'].split('?')[0] not in  hasProcessed):
+                                if ('url' in v.keys() and
+                                    v['url'] not in [None,""] and 
+                                    v['url'].startswith('http') and
+                                    'type' in v.keys() and 
+                                    v['type'] not in [None,""] and (
+                                        'wms' in v['type'].lower() or 
+                                        'wfs' in v['type'].lower()) and
+                                    v['url'].split('?')[0] not in  hasProcessed):
                                     hasProcessed.append(v['url'].split('?')[0])
                                     print('check distribution:',v.get('url',''),v.get('type',''),v.get('name',''))
                                     owsCapabs = checkOWSLayer(v.get('url',''),
@@ -282,7 +286,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                             #    print ('can not remove original file',fname,e)
 
                                             for k,l in hasFiles.items():
-                                                print('ttl',l['meta']['identification']['title'])
                                                 # are they vizualistations of the same dataset, or unique?
                                                 # see if their identification is unique, else consider them distributions of the same dataset
                                                 
@@ -473,10 +476,17 @@ def importCsv(dir,dir_out,map,sep,cluster,prefix):
                     # check identifier
                     checkId(yMcf,'',prefix)
                     myid = yMcf['metadata']['identifier']
-
+                    fn = safeFileName(myid)
+                    if len(fn) > 32:
+                        fn = fn[:32]
+                    elif len(fn) < 16: ## extent title with organisation else part of abstract
+                        letters = yMcf['identification'].get('abstract')
+                        for c in yMcf.get('contact',{}).keys():
+                            letters = yMcf['contact'][c].get('organization',yMcf['contact'][c].get('individualname','None'))
+                        fn = fn+'-'+'-'+safeFileName(letters)[:16]
                     # write out the yml
-                    print("Save to file",os.path.join(fldr,myid+'.yml'))
-                    with open(os.path.join(fldr,myid+'.yml'), 'w+') as f:
+                    print("Save to file",os.path.join(fldr,fn+'.yml'))
+                    with open(os.path.join(fldr,fn+'.yml'), 'w+') as f:
                         yaml.dump(yMcf, f, sort_keys=False)
 
 def insert_or_update(content, db, dbtype):

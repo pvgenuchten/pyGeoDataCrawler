@@ -234,28 +234,25 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                         if fileinfo['type']=='raster':
                                             new_class_string2 = 'PROCESSING "NODATA=' + str(band1.get('nodata', 32768)) + '"\n' + new_class_string2
 
-
                                         new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
 
-
                                         strLr = new_layer_string.format(name=fb,
-                                                    title='"'+cnt.get('identification',{}).get('title', '')+'"',
-                                                    abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
-                                                    type=fileinfo['type'],
-                                                    path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
-                                                    template=ly.get('template'),
-                                                    projection=projection,
-                                                    projections=projections,
-                                                    extent=" ".join(map(str,fileinfo['bounds'])),
-                                                    id="fid", # todo, use field from attributes, config?
-                                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
-                                                    classes=new_class_string2)
+                                            title='"'+cnt.get('identification',{}).get('title', '')+'"',
+                                            abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
+                                            type=fileinfo['type'],
+                                            path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
+                                            template=ly.get('template'),
+                                            projection=projection,
+                                            projections=projections,
+                                            extent=" ".join(map(str,fileinfo['bounds'])),
+                                            id="fid", # todo, use field from attributes, config?
+                                            mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
+                                            classes=new_class_string2)
                                         #except Exception as e:
                                         #    print("Failed creation of layer {0}; {1}".format(cnt['name'], e))
                                             
                                         try:
                                             mslr = mappyfile.loads(strLr)
-
                                             lyrs.insert(len(lyrs) + 1, mslr)
                                         except Exception as e:
                                             print("Failed creation of layer {0}; {1}".format(fb, e))
@@ -361,7 +358,6 @@ def colorCoding(geomtype,min,max,style):
     if isinstance(style,list):
         return colorCoding(geomtype,min,max,{"classes":style}) # backwards compat
     elif isinstance(style,dict): # 3 cases: array of color, array of ranges, array of absolutes
-        print('yoo')
         classes = style.get('classes','#ff0000,#ffff00,#00ff00,#00ffff,#0000ff')
         clsstr = ""
         # test is classes is string -> array
@@ -369,13 +365,11 @@ def colorCoding(geomtype,min,max,style):
             classes = classes.split(',')
         # a list of classes
         if isinstance(classes[0],str) or isinstance(classes[0],list): # list may be a color [255 255 0]
-            print('foo')
             getcontext().prec = 4 # set precision of decimals, so classes are not too specific
             if min in [None,''] or max in [None,'']: # for vector max-min currently None, todo: can fetch from data
                 rng = 0
             else:
                 rng = Decimal(max - min)
-            print('roo',rng)
             if rng > 0:
                 sgmt =  Decimal(rng/len(classes))
                 cur =  Decimal(min)
@@ -389,7 +383,6 @@ def colorCoding(geomtype,min,max,style):
                 print('Can not derive classes, negative range',min,max,rng)
                 return ""
         elif isinstance(classes[0],dict):
-            print('loo')
             for cls in classes:
                 if 'val' in cls.keys() and cls['val'] not in [None]:
                     lbl = cls.get('label',str(cls['val']))
