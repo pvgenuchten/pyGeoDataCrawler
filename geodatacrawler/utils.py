@@ -62,7 +62,11 @@ def indexFile(fname, extension):
             })
 
         content['bounds'] = [ulx, lry, lrx, uly]
-        content['bounds_wgs84'] = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
+        if crs2code(d.GetProjection()) == 'EPSG:4326':
+            content['bounds_wgs84'] = content['bounds']
+        else:
+            content['bounds_wgs84'] = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
+                
         #which crs
         content['crs-str'] = str(d.GetProjection())
         crs = crs2code(d.GetProjection())
@@ -101,7 +105,10 @@ def indexFile(fname, extension):
         content['geomtype'] = tp
         # change axis order
         content['bounds'] = [b[0],b[2],b[1],b[3]]
-        content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
+        if crs2code(srs) == 'EPSG:4326':
+            content['bounds_wgs84'] = content['bounds']
+        else:
+            content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
         
         content['crs-str'] = str(srs)
         content['crs'] = crs2code(srs)

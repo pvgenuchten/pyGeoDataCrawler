@@ -217,9 +217,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                         if 'template' not in ly.keys() or ly['template'] != '': # custom template
                                             if fileinfo['type']=='raster':
                                                 ly['template'] = 'grid.html'
-                                                if not os.path.exists(os.path.join('' if dir_out_mode == 'nested' else relPath,'grid.html')):
+                                                if not os.path.exists(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html')):
                                                     gridinfofile = pkg_resources.read_text(templates, 'grid.html')
-                                                    with open(os.path.join('' if dir_out_mode == 'nested' else relPath,'grid.html'), 'w') as f:
+                                                    with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html'), 'w') as f:
                                                        f.write(gridinfofile) 
                                             else:
                                                 ly['template'] = ly.get('template', f'{fb}.html')
@@ -227,7 +227,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                                 for attr in fileinfo.get('content_info',{}).get('attributes',{}).keys():
                                                     vectorinfofile += f"{attr}: [{attr}]<br/>"
                                                 vectorinfofile += "<hr/>"
-                                                with open(os.path.join('' if dir_out_mode == 'nested' else relPath,fb+'.html'), 'w') as f:
+                                                with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),fb+'.html'), 'w') as f:
                                                     f.write(vectorinfofile) 
 
                                         # prepend nodata on grids
