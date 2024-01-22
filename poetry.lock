@@ -31,14 +31,19 @@ tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pyte
 
 [[package]]
 name = "bibtexparser"
-version = "1.4.1"
+version = "2.0.0b5"
 description = "Bibtex parser for python 3"
 category = "main"
 optional = false
 python-versions = "*"
 
 [package.dependencies]
-pyparsing = ">=2.0.3"
+pylatexenc = ">=2.10"
+
+[package.extras]
+docs = ["sphinx"]
+lint = ["black (==23.3.0)", "isort (==5.12.0)", "docstr-coverage (==2.2.0)"]
+test = ["pytest", "pytest-xdist", "pytest-cov", "jupyter"]
 
 [[package]]
 name = "certifi"
@@ -96,7 +101,7 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "gdal"
-version = "3.8.1"
+version = "3.3.2"
 description = "GDAL: Geospatial Data Abstraction Library"
 category = "main"
 optional = false
@@ -253,14 +258,6 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "numpy"
-version = "1.24.4"
-description = "Fundamental package for array computing in Python"
-category = "main"
-optional = false
-python-versions = ">=3.8"
-
-[[package]]
-name = "numpy"
 version = "1.26.2"
 description = "Fundamental package for array computing in Python"
 category = "main"
@@ -357,15 +354,12 @@ OWSLib = "*"
 pyyaml = "*"
 
 [[package]]
-name = "pyparsing"
-version = "3.1.1"
-description = "pyparsing module - Classes and methods to define and execute parsing grammars"
+name = "pylatexenc"
+version = "2.10"
+description = "Simple LaTeX parser providing latex-to-unicode and unicode-to-latex conversion"
 category = "main"
 optional = false
-python-versions = ">=3.6.8"
-
-[package.extras]
-diagrams = ["railroad-diagrams", "jinja2"]
+python-versions = "*"
 
 [[package]]
 name = "pyproj"
@@ -495,6 +489,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "unidecode"
+version = "1.3.8"
+description = "ASCII transliterations of Unicode text"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[[package]]
 name = "urllib3"
 version = "2.1.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -522,7 +524,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-ena
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "c81e7fadb1c883c0243c3a0c8a19d5085322a757ca11ba9f2c53b7eb2d388b0d"
+content-hash = "a3f1cba98ed2501083a77774d845c23026406e06890b73398d54e0d06b6198cd"
 
 [metadata.files]
 arrow = []
@@ -555,7 +557,7 @@ pandas = []
 pkgutil-resolve-name = []
 pluggy = []
 pygeometa = []
-pyparsing = []
+pylatexenc = []
 pyproj = []
 pysqlite3 = []
 pytest = []
@@ -568,5 +570,6 @@ rpds-py = []
 six = []
 tomli = []
 types-python-dateutil = []
+unidecode = []
 urllib3 = []
 zipp = []

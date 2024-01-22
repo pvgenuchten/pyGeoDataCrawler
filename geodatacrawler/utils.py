@@ -2,6 +2,7 @@ from logging import NullHandler
 from unidecode import unidecode
 import os
 import time
+import datetime
 import sys
 import pprint
 import urllib.request
@@ -421,16 +422,31 @@ def fetchMetadata(u):
     if not (u.strip().startswith('http') or u.strip().startswith('//')):
         return None
 
-    if 'doi.org' in u:
+    if 'doi.org/' in u:
         try:
             resp = fetchUrl("https://api.datacite.org/dois/"+u.split('doi.org/')[1])
             if resp.status_code == 200:
-                md = parseDataCite(resp.text,u)  
+                md = parseDataCite(json.loads(resp.text),u)  
                 return md
             else:
                 print('doi 404', u) # todo: retrieve instead the citation
         except Exception as e:
-                print("Failed to fetch ",u.split('doi.org/')[1],str(e))
+                print("Failed to fetch ",u.split('doi.org/').pop(),str(e),"trying bibtex")
+                #try:
+                if 0==0: 
+                    import bibtexparser
+                    resp = fetchUrl(u,{"Accept": "application/x-bibtex; charset=utf-8", 'User-agent': 'Mozilla/5.0'})
+                    article = bibtexparser.parse_string(resp.text)
+                    for first_entry in article.entries:
+                        md = {"identifier": safeFileName(first_entry.key) }
+                        md['type'] = first_entry.entry_type
+                        for f in first_entry.fields:
+                            md[f.key] = f.value                     
+                        return parseDC(md,md.get('title',safeFileName(u.split('doi.org/').pop())))
+                    return None
+                #except Exception as e:
+                #    print("Failed to parse bibtex ",u,str(e))
+
     else:
         # Try a generic request
         try:
@@ -438,7 +454,7 @@ def fetchMetadata(u):
             restype = resp.headers['Content-Type']
             md = {}
             if (restype == 'application/json'):
-                md = parseDataCite(resp.text,u)
+                md = parseDataCite(json.loads(resp.text),u)
                 # datapackage, stac, ogcapi-records, etc....   
             elif ('application/xml' in restype or 'text/xml' in restype):
                 # datacite can also be in xml
@@ -450,8 +466,7 @@ def fetchMetadata(u):
         except Exception as e:
                 print("Failed to fetch",u,str(e))    
 
-def parseDataCite(strJSON, u):
-    attrs = json.loads(strJSON)
+def parseDataCite(attrs, u):
     # some datacite embeds content in data.attributes
     if ('data' in attrs and 'attributes' in attrs['data']):
         attrs = attrs.get('data',{}).get('attributes',{})
@@ -498,6 +513,61 @@ def getDate(fname):
     except Exception as e:
         print("WARNING: Error getting date",fname,str(e)) 
     return d
+
+
+'''
+parse a dublin core record to MCF
+'''
+def parseDC(dct,fname):
+
+    # make sure dcparams are available and not None
+    dcparams = 'contentStatus,lastPrinted,revision,version,creator,url,copyright,lastModifiedBy,modified,created,title,subject,description,identifier,language,keywords,category,year'.split(',')
+    for p in dcparams:
+        if p not in dct.keys() or dct[p] == None:
+            dct[p] = ""
+
+    exp = {"mcf":{"version":1.0}}
+    for k in ['metadata','spatial','identification','distribution','contact']:
+        exp[k] = {}
+    
+    if 'name' not in dct.keys() or dct['name'] in [None,'']:
+        dct['name'] = dct.get('title',fname)
+    if dct['name'] == '':
+        dct['name'] = fname
+    exp['identification']['title'] = dct['name']
+    exp['metadata']['identifier'] = dct.get('identifier',safeFileName(exp['identification']['title']))
+    exp['identification']['abstract'] = dct.get('description','')
+
+    exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', datetime.date.today())) 
+    for ct in "author,publisher,creator".split(','):    
+        for c in dct.get(ct,'').replace(' and ',';').split(';'):
+            print(c)
+            if c.strip() == '':
+                None
+            if '@' in c:
+                exp['contact'][safeFileName(c)] = {'email': c, 'role':ct}
+            else:
+                exp['contact'][safeFileName(c)] = {'individualname': c, 'role':ct}
+    exp['identification']['keywords'] = {'default': {'keywords': [k for k in (dct.get('keywords','').split(',') + dct.get('subject','').split(',') + dct.get('category','').split(',')) if k]}}
+    exp['spatial']['datatype'] = dct.get('datatype','')
+    exp['spatial']['geomtype'] = dct.get('geomtype','')
+    exp['identification']['status'] = dct.get('contentStatus','' )
+    exp['identification']['language'] = dct.get('language','')
+    exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
+    exp['identification']['rights'] = dct.get('copyright','')
+    if 'extents' not in exp['identification'].keys():
+        exp['identification']['extents'] = {}
+    if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
+        bnds = dct.get('bounds_wgs84')
+        crs = 4326
+    else:
+        bnds = dct.get('bounds',[])
+        crs = dct.get('crs','4326')
+    exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
+    exp['content_info'] = dct.get('content_info',{})  
+    if dct['url'] not in [None,'']:
+        exp['distribution']['www'] = {'name': fname, 'url': dct['url'], 'type': 'www'}
+    return exp
 
 def parseISO(strXML, u):
     # check if a csw request
@@ -577,14 +647,16 @@ def owsCapabilities2md (url, protocol):
     
     return lyrmd
 
-def fetchUrl(url):
+def fetchUrl(url,hdr=None):
+    if hdr in [None,'']:
+        hdr={'User-agent': 'Mozilla/5.0'}
     try:
-        r = req.get(url, headers={'User-agent': 'Mozilla/5.0'}, timeout=5)
+        r = req.get(url, headers=hdr, timeout=5)
         r.raise_for_status()
         return r
     except req.exceptions.SSLError as sslerr:
         print('retry without cert validation',sslerr)
-        return req.get(url, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+        return req.get(url, headers=hdr, verify=False, timeout=5)
 
 def safeFileName(n):
     if n not in [None,'']:

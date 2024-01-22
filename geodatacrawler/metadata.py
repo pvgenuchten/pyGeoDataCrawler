@@ -12,7 +12,7 @@ from pygeometa.schemas.stac import STACItemOutputSchema
 from pygeometa.schemas.ogcapi_records import OGCAPIRecordOutputSchema
 from pygeometa.schemas.dcat import DCATOutputSchema
 from pygeometa.core import read_mcf, render_j2_template
-from geodatacrawler.utils import indexFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName
+from geodatacrawler.utils import indexFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName, parseDC
 from geodatacrawler import GDCCONFIG
 from pathlib import Path
 import pandas as pd
@@ -242,10 +242,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                             orig['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
                             orig['content_info'] = cnt.get('content_info',{})
 
-
-                        
-                        
-
                         skipOWS = False # not needed if this is fetched from remote
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
                         if resolve and orig['metadata'].get('dataseturi','').startswith('http'):
@@ -365,7 +361,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     if localFile:
                                         hasFile = localFile
                                         cnt = indexFile(target_path+os.sep+hasFile, extension)
-                                        md2 = asPGM(cnt,fname)
+                                        md2 = parseDC(cnt,fname)
                                         if (md2['identification']['title']):
                                             md2['identification']['title'] = None
                                         if md2['metadata']['identifier']:
@@ -393,7 +389,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
                         cnt = indexFile(fname, extension) 
-                        md = asPGM(cnt,fname)
+                        md = parseDC(cnt,fname)
                         checkId(md,str(os.path.join(relPath,fn)).replace(os.sep,'-'),prefix)
                         if 'identification' not in md or md['identification'] is None:
                             md['identification'] = {}
@@ -533,53 +529,6 @@ def checkId(md, fn, prefix):
         if md['metadata'] in [None,'']:
            md['metadata'] = {}
         md['metadata']['identifier'] = safeFileName(myuuid)
-
-# format a index dict as pygeometa
-def asPGM(dct,fname):
-
-    # make sure dcparams are available and not None
-    dcparams = 'contentStatus,lastPrinted,revision,version,creator,lastModifiedBy,modified,created,title,subject,description,identifier,language,keywords,category'.split(',')
-    for p in dcparams:
-        if p not in dct.keys() or dct[p] == None:
-            dct[p] = ""
-
-    tpl = pkg_resources.open_text(templates, 'PGM.tpl')
-    exp = yaml.safe_load(tpl)
-    for k in ['metadata','spatial','identification','distribution']:
-        if not k in exp.keys():
-            exp[k] = {}
-    
-    if 'name' not in dct.keys() or dct['name'] in [None,'']:
-        dct['name'] = fname
-    exp['identification']['title'] = dct['name']
-    exp['metadata']['identifier'] = dct.get('identifier',safeFileName(exp['identification']['title']))
-    exp['identification']['abstract'] = dct.get('description','')
-
-    exp['metadata']['datestamp'] = dct.get('modified', datetime.date.today())      
-    for c in dct.get('creator','').split(';'):
-        if '@' in c:
-            exp['contact'][safeFileName(c)] = {'email': c, 'role':'creator'}
-        else:
-            exp['contact'][safeFileName(c)] = {'individualname': c, 'role':'creator'}
-    exp['identification']['keywords'] = {'default': {'keywords': [k for k in (dct.get('keywords','').split(',') + dct.get('subject','').split(',') + dct.get('category','').split(',')) if k]}}
-    exp['spatial']['datatype'] = dct.get('datatype','')
-    exp['spatial']['geomtype'] = dct.get('geomtype','')
-    exp['identification']['status'] = dct.get('contentStatus','' )
-    exp['identification']['language'] = dct.get('language','')
-    exp['identification']['dates'] = { 'creation': dct.get('date',datetime.date.today()) }
-    if 'extents' not in exp['identification'].keys():
-        exp['identification']['extents'] = {}
-    if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
-        bnds = dct.get('bounds_wgs84')
-        crs = 4326
-    else:
-        bnds = dct.get('bounds',[])
-        crs = dct.get('crs','4326')
-    exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
-    exp['content_info'] = dct.get('content_info',{}) 
-    #exp['distribution']['www']['url'] = webdavUrl+dct['url'] 
-    #exp['distribution']['www']['name'] = dct['name'] 
-    return exp
 
 def merge_folder_metadata(coreMetadata, path, mode):    
     # if dir has index.yml merge it to paren
