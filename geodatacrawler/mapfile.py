@@ -108,7 +108,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
         mf["web"]["metadata"]["ows_attribution_onlineresource"] = first.get("url","")
     mf["web"]["metadata"]["ows_fees"] = coreMetadata.get('identification').get("fees","")
     mf["web"]["metadata"]["ows_accessconstraints"] = coreMetadata.get('identification').get("accessconstraints","") 
-    mf["web"]["metadata"]["ows_onlineresource"] = config['msUrl'] + '/' + mf["name"]
+    mf["web"]["metadata"]["ows_onlineresource"] = config['msUrl'] + mf["name"]
     mf["web"]["metadata"]["oga_onlineresource"] = mf["web"]["metadata"]["ows_onlineresource"] + '/ogcapi'
 
     for file in Path(os.path.join(config['rootDir'],relPath)).iterdir():
@@ -127,6 +127,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
             elif '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split(os.sep).pop()
+
                 # do we trigger on ymls only, or also on spatial files? to go back to the file from the yml works via distribution(s)?
                 if extension.lower() in ["yml","yaml"] and fn != "index":
                     # todo: operational metadata contains information on how to process the folder
@@ -143,132 +144,144 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                             # prepare layer(s)
                             # print('Found',len(cnt.get('distribution',{}).items()),'existing disributions in',fname)
 
-                            for d,v in cnt.get('distribution',{}).items():
-                                # for each link check if local file exists
-                                parsed = urlparse(v.get('url',''))
-                                fn = str(parsed.path).split('/').pop()
-                                sf = os.path.join(config['rootDir'], relPath , fn)
-                                if v['type'] in [None,'']:
-                                    v['type'] = "unknown"
-                                if not v.get('type','').startswith('OGC:') and os.path.exists(sf):
-                                    print('processing file' + sf)
-                                    fb,e = str(fn).rsplit('.', 1)
-                                    if e and e.lower() in GDCCONFIG["SPATIAL_FILE_TYPES"]:
-                                    # we better index the file again... to get band info etc
-                                        fileinfo = indexFile(sf, e)
-                                        if (fileinfo.get('datatype','').lower() == "raster"):
-                                            fileinfo['type'] = 'raster'
-                                        elif (fileinfo.get('geomtype','').lower() in ["linestring", "line", "multiline", "polyline", "wkblinestring"]):
-                                            fileinfo['type'] = 'line'
-                                        elif (fileinfo.get('geomtype','') in ["point", "multipoint", "wkbpoint",
-                                                                    'table']):  # table is suggested for CSV, which is usually point (or none)
-                                            fileinfo['type'] = 'point'
-                                        else:
-                                            fileinfo['type'] = 'polygon'
+                            dataFile = []
+                            # check if a data file with same name exits
+                            for ext in GDCCONFIG["INDEX_FILE_TYPES"]:
+                                if (os.path.exists(str(file).replace('yml',ext))):
+                                    dataFile.append(str(file).replace('yml',ext))
+                            
+                            if len(dataFile) == 0:
+                                for d,v in cnt.get('distribution',{}).items():
+                                    # for each link check if local file exists
+                                    parsed = urlparse(v.get('url',''))
+                                    fn = str(parsed.path).split('/').pop()
+                                    sf = os.path.join(config['rootDir'], relPath , fn)
+                                    if v.get('type') in [None,'']:
+                                        v['type'] = "unknown"
+                                    if not v.get('type','').startswith('OGC:') and os.path.exists(sf):
+                                        fb,e = str(fn).rsplit('.', 1)
+                                        if e and e.lower() in GDCCONFIG["SPATIAL_FILE_TYPES"] and sf not in dataFile:
+                                            dataFile.append(sf)
 
-                                        # bounds_wgs84 also exists, but often empty
-                                        # else cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('bbox')
-                                        if not 'bounds' in fileinfo.keys():
-                                            fileinfo['bounds'] = [-180,-90,180,90]
-                                        else:
-                                            updateBounds(fileinfo['bounds_wgs84'], config['map']['extent'])
-                                        
-                                        # default val from index.yml
-                                        projections = ly.get('projections', 'epsg:4326 epsg:3857');
-                                        # first take value from file, take srs-str, else take override value from index.yml, else  4326
-                                        # else cnt['crs'] = cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('crs')
-                                        if fileinfo.get('crs') not in [None,'']:
-                                            projections = fileinfo.get('crs') + ' ' + projections
-                                            projection = fileinfo.get('crs')
-                                        elif fileinfo.get('crs-str') not in [None,'']:
-                                            projection = fileinfo.get('crs-str')
-                                        elif ly.get('crs') not in [None,'']:
-                                            projections = ly.get('crs') + ' ' + projections
-                                            projection = ly.get('crs')
-                                        else: 
-                                            projection = 'epsg:4326'
+                            # process the files in dataFile
+                            for sf in dataFile:
+                                print('processing file' + sf)
+                                fn = sf.split('/').pop()
+                                fb,e = fn.rsplit('.', 1) 
+                                fileinfo = indexFile(sf, e)
+                                if (fileinfo.get('datatype','').lower() == "raster"):
+                                    fileinfo['type'] = 'raster'
+                                elif (fileinfo.get('geomtype','').lower() in ["linestring", "line", "multiline", "polyline", "wkblinestring"]):
+                                    fileinfo['type'] = 'line'
+                                elif (fileinfo.get('geomtype','') in ["point", "multipoint", "wkbpoint",
+                                                            'table']):  # table is suggested for CSV, which is usually point (or none)
+                                    fileinfo['type'] = 'point'
+                                else:
+                                    fileinfo['type'] = 'polygon'
 
-                                        # evaluate if a custom style is defined
-                                        band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0]
-                                        new_class_string2 = ""
-                                        
-                                        if 'styles' in ly.keys() and isinstance(ly['styles'],list):
-                                            for style_reference in ly.get("styles", []): 
-                                                # if isinstance(style_reference,dict): 
-                                                #    new_class_string2 += f"CLASSGROUP \"{style_reference.get('name','Default')}\"\n"
-                                                if isinstance(style_reference,str): # case string (mapfile syntax)
-                                                    stylefile = os.path.join(config['rootDir'],relPath,style_reference)
-                                                    if os.path.exists(stylefile):
-                                                        with open(stylefile) as f1:
-                                                            new_class_string2 += f1.read()
-                                                    else:
-                                                        print(f'Stylefile {stylefile} does not exist')
-                                                
-                                                elif fileinfo['type']=='raster': # set colors for range, only first band supported
-                                                    new_class_string2 += colorCoding('raster',band1.get('min',0), band1.get('max',0),style_reference)
-                                                else: # vector
-                                                    new_class_string2 += colorCoding(fileinfo['type'],None,None,style_reference)
-                                        else:
-                                            print(f'styles defined for layer {fn}, but not type list')
-                                           
-                                        if new_class_string2 == "":
-                                            new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
+                                # bounds_wgs84 also exists, but often empty
+                                # else cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('bbox')
+                                if not 'bounds' in fileinfo.keys():
+                                    fileinfo['bounds'] = [-180,-90,180,90]
+                                else:
+                                    updateBounds(fileinfo['bounds_wgs84'], config['map']['extent'])
+                                
+                                # default val from index.yml
+                                projections = ly.get('projections', 'epsg:4326 epsg:3857');
+                                # first take value from file, take srs-str, else take override value from index.yml, else  4326
+                                # else cnt['crs'] = cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('crs')
+                                if fileinfo.get('crs') not in [None,'']:
+                                    projections = fileinfo.get('crs') + ' ' + projections
+                                    projection = fileinfo.get('crs')
+                                elif fileinfo.get('crs-str') not in [None,'']:
+                                    projection = fileinfo.get('crs-str')
+                                elif ly.get('crs') not in [None,'']:
+                                    projections = ly.get('crs') + ' ' + projections
+                                    projection = ly.get('crs')
+                                else: 
+                                    projection = 'epsg:4326'
 
-                                        if 'template' not in ly.keys() or ly['template'] != '': # custom template
-                                            if fileinfo['type']=='raster':
-                                                ly['template'] = 'grid.html'
-                                                if not os.path.exists(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html')):
-                                                    gridinfofile = pkg_resources.read_text(templates, 'grid.html')
-                                                    with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html'), 'w') as f:
-                                                       f.write(gridinfofile) 
+                                # evaluate if a custom style is defined
+                                band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0]
+                                new_class_string2 = ""
+
+                                if 'styles' in ly.keys() and isinstance(ly['styles'],list):
+                                    for style_reference in ly.get("styles", []): 
+                                        # if isinstance(style_reference,dict): 
+                                        #    new_class_string2 += f"CLASSGROUP \"{style_reference.get('name','Default')}\"\n"
+                                        if isinstance(style_reference,str): # case string (mapfile syntax)
+                                            stylefile = os.path.join(config['rootDir'],relPath,style_reference)
+                                            if os.path.exists(stylefile):
+                                                with open(stylefile) as f1:
+                                                    new_class_string2 += f1.read()
                                             else:
-                                                ly['template'] = ly.get('template', f'{fb}.html')
-                                                vectorinfofile = "<!-- MapServer Template -->\n"
-                                                for attr in fileinfo.get('content_info',{}).get('attributes',{}).keys():
-                                                    vectorinfofile += f"{attr}: [{attr}]<br/>"
-                                                vectorinfofile += "<hr/>"
-                                                with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),fb+'.html'), 'w') as f:
-                                                    f.write(vectorinfofile) 
+                                                print(f'Stylefile {stylefile} does not exist')
+                                        
+                                        elif fileinfo['type']=='raster': # set colors for range, only first band supported
+                                            new_class_string2 += colorCoding('raster',band1.get('min',0), band1.get('max',0),style_reference)
+                                        else: # vector
+                                            new_class_string2 += colorCoding(fileinfo['type'],None,None,style_reference)
+                                else:
+                                    print(f'styles defined for layer {fn}, but not type list')
+                                    
+                                if new_class_string2 == "":
+                                    new_class_string2 = pkg_resources.read_text(templates, 'class-' + fileinfo['type'] + '.tpl')
 
-                                        # prepend nodata on grids
-                                        if fileinfo['type']=='raster':
-                                            new_class_string2 = 'PROCESSING "NODATA=' + str(band1.get('nodata', 32768)) + '"\n' + new_class_string2
+                                if 'template' not in ly.keys() or ly['template'] != '': # custom template
+                                    if fileinfo['type']=='raster':
+                                        ly['template'] = 'grid.html'
+                                        if not os.path.exists(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html')):
+                                            gridinfofile = pkg_resources.read_text(templates, 'grid.html')
+                                            with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html'), 'w') as f:
+                                                f.write(gridinfofile) 
+                                    else:
+                                        ly['template'] = ly.get('template', f'{fb}.html')
+                                        vectorinfofile = "<!-- MapServer Template -->\n"
+                                        for attr in fileinfo.get('content_info',{}).get('attributes',{}).keys():
+                                            vectorinfofile += f"{attr}: [{attr}]<br/>"
+                                        vectorinfofile += "<hr/>"
+                                        with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),fb+'.html'), 'w') as f:
+                                            f.write(vectorinfofile) 
 
-                                        new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
+                                # prepend nodata on grids
+                                if fileinfo['type']=='raster' and str(band1.get('nodata','')) not in ['None','','NaN']:
+                                    new_class_string2 = 'PROCESSING "NODATA=' + str(band1.get('nodata', '')) + '"\n' + new_class_string2
 
-                                        strLr = new_layer_string.format(name=fb,
-                                            title='"'+cnt.get('identification',{}).get('title', '')+'"',
-                                            abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
-                                            type=fileinfo['type'],
-                                            path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
-                                            template=ly.get('template'),
-                                            projection=projection,
-                                            projections=projections,
-                                            extent=" ".join(map(str,fileinfo['bounds'])),
-                                            id="fid", # todo, use field from attributes, config?
-                                            mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
-                                            classes=new_class_string2)
-                                        #except Exception as e:
-                                        #    print("Failed creation of layer {0}; {1}".format(cnt['name'], e))
-                                            
-                                        try:
-                                            mslr = mappyfile.loads(strLr)
-                                            lyrs.insert(len(lyrs) + 1, mslr)
-                                        except Exception as e:
-                                            print("Failed creation of layer {0}; {1}".format(fb, e))
+                                new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
 
-                                        # does metadata already include a link to wms/wfs? else add it.
-                                        for mdlinktype in config['mdLinkTypes']:
-                                            relPath2 = relPath if dir_out_mode == 'nested' else ''
-                                            if mdlinktype in ['OGC:WMS']:
-                                                if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
-                                            elif fileinfo['datatype'] == 'raster' and mdlinktype == 'OGC:WCS':
-                                                if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
-                                            elif fileinfo['datatype'] == 'vector' and mdlinktype == 'OGC:WFS' :
-                                                if not checkLink(cnt, mdlinktype, config):
-                                                    addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
+                                strLr = new_layer_string.format(name=fb,
+                                    title='"'+cnt.get('identification',{}).get('title', '')+'"',
+                                    abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
+                                    type=fileinfo['type'],
+                                    path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
+                                    template=ly.get('template'),
+                                    projection=projection,
+                                    projections=projections,
+                                    extent=" ".join(map(str,fileinfo['bounds'])),
+                                    id="fid", # todo, use field from attributes, config?
+                                    mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
+                                    classes=new_class_string2)
+                                #except Exception as e:
+                                #    print("Failed creation of layer {0}; {1}".format(cnt['name'], e))
+                                    
+                                try:
+                                    mslr = mappyfile.loads(strLr)
+                                    lyrs.insert(len(lyrs) + 1, mslr)
+                                except Exception as e:
+                                    print("Failed creation of layer {0}; {1}".format(fb, e))
+
+                                # does metadata already include a link to wms/wfs? else add it.
+                                for mdlinktype in config['mdLinkTypes']:
+                                    relPath2 = relPath if dir_out_mode == 'nested' else ''
+                                    if mdlinktype in ['OGC:WMS']:
+                                        if not checkLink(cnt, mdlinktype, config):
+                                            addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
+                                    elif fileinfo['datatype'] == 'raster' and mdlinktype == 'OGC:WCS':
+                                        if not checkLink(cnt, mdlinktype, config):
+                                            addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
+                                    elif fileinfo['datatype'] == 'vector' and mdlinktype == 'OGC:WFS' :
+                                        if not checkLink(cnt, mdlinktype, config):
+                                            addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
 
     # map should have initial layer, remove it
     lyrs.pop(0)
@@ -313,9 +326,9 @@ def addLink(type, layer, file, relPath, map, config):
     # add link
         if 'distribution' not in orig.keys():
             orig['distribution'] = {}
-        msUrl2 = config['msUrl'] + ('/'+ relPath if relPath != '' else '')
+        msUrl2 = config['msUrl'] + (relPath if relPath != '' else '')
         orig['distribution'][type.split(':').pop()] = {
-            'url':  msUrl2 + '/' + map +'?service='+type.split(':').pop()+'&amp;request=GetCapabilities',
+            'url':  msUrl2 + map +'?service='+type.split(':').pop()+'&amp;request=GetCapabilities',
             'type': type,
             'name': layer,
             'description': ''

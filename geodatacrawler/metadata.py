@@ -1,4 +1,4 @@
-import click, yaml
+import click, yaml, xmltodict
 import importlib.resources as pkg_resources
 from yaml.loader import SafeLoader
 import os, traceback
@@ -12,7 +12,7 @@ from pygeometa.schemas.stac import STACItemOutputSchema
 from pygeometa.schemas.ogcapi_records import OGCAPIRecordOutputSchema
 from pygeometa.schemas.dcat import DCATOutputSchema
 from pygeometa.core import read_mcf, render_j2_template
-from geodatacrawler.utils import indexFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName, parseDC
+from geodatacrawler.utils import indexFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName, parseDC, parseISO
 from geodatacrawler import GDCCONFIG
 from pathlib import Path
 import pandas as pd
@@ -26,6 +26,9 @@ from owslib.iso import *
 from owslib.fgdc import *
 from . import templates
 from hashlib import md5
+
+import faulthandler
+faulthandler.enable()
 
 webdavUrl = os.getenv('pgdc_webdav_url')
 canonicalUrl = os.getenv('pgdc_canonical_url')
@@ -44,9 +47,11 @@ schemaPath = os.getenv('pgdc_schema_path') or os.path.join(os.path.dirname(__fil
 @click.option('--map', nargs=1, required=False, help="a mappingfile for csv")
 @click.option('--resolve', nargs=1, required=False, help="Resolve remote URI's to fetch remote metadata, default:False")
 @click.option('--prefix', nargs=1, required=False, help="Use prefix, when creating record ID")
-@click.option('--sep', nargs=1, required=False, help="which separator is used on csv, default:,")
+@click.option('--sep', nargs=1, required=False, help="which separator is used on csv, default:, (excel uses ';')")
+@click.option('--enc', nargs=1, required=False, help="which encoding is used on csv, default:UTF-8 (excel uses cp1252)")
 @click.option('--cluster', nargs=1, required=False, help="Use a field to cluster records in a folder, default:none")
-def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve, prefix, sep, cluster):
+
+def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve, prefix, sep, enc, cluster):
     if not dir:
         dir = "./"
     if dir[-1] == os.sep:
@@ -90,7 +95,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve
     initialMetadata = load_default_metadata(mode)
 
     if mode=='import-csv':
-        importCsv(dir, dir_out, map, sep, cluster, prefix)
+        importCsv(dir, dir_out, map, sep, enc, cluster, prefix)
     else:
         processPath(dir, initialMetadata, mode, dbtype, dir_out, dir_out_mode, dir, resolve, prefix, profile)
 
@@ -105,6 +110,9 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
         skipSubfolders = cnf2['skip-subfolders']
 
     for file in Path(target_path).iterdir():
+
+
+
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and not fname.startswith('.') and not fname.startswith('~') and not str(file).endswith('.gdb'):
             # go one level deeper
@@ -121,15 +129,54 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
             elif '.' in str(file):
                 base, extension = str(file).rsplit('.', 1)
                 mydir = os.path.dirname(file)
+                fn = base.split(os.sep).pop()
                 relPath = ""
                 if mydir != "":
                     relPath = os.path.relpath(os.path.dirname(file), root)
                 # why is this, maybe sould be len(rp)==1?
                 if relPath == '1':
                     relPath == ''
-                fn = base.split(os.sep).pop()
+                if (dir_out_mode=='flat'):
+                    outBase = os.path.join(dir_out,fn)
+                else:    
+                    outBase = os.path.join(dir_out,relPath,fn)
+                yf = os.path.join(outBase+'.yml')
                 #relPath=base.replace(root,'')
-                if extension.lower() in ["yml","yaml","mcf"] and fn != "index":
+                if extension.lower() in ["xml"] and fn != "index":
+                    if mode == "init":
+                        with open(str(file), mode="r", encoding="utf-8") as f:
+                            fc = f.read()
+                            if 'MD_Metadata' in fc:
+                                md = parseISO(fc,fn)
+                                checkId(md, fn, "")
+                            elif 'oai_dc:dc' in fc:
+                                dc = xmltodict.parse(fc)
+                                dc2 = {}
+                                for k in dc[next(iter(dc))].keys():
+                                    if not k.startswith('@'):
+                                        if ':' in k:
+                                            k2 = k.split(':').pop()
+                                        else: 
+                                            k2 = k
+                                        dc2[k2] = dc[next(iter(dc))][k]
+                                md = parseDC(dc2,fn)
+                                checkId(md, fn, "")
+                            else:
+                                print(f'Not parseable xml: {str(file)}')
+                            
+                            if md:
+                                if not os.path.exists(os.path.join(dir_out,relPath)):
+                                    print('create folder',os.path.join(dir_out,relPath))
+                                    os.makedirs(os.path.join(dir_out,relPath))
+                                    
+                                # write yf
+                                try:
+                                    with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
+                                        yaml.dump(md, f, sort_keys=False)
+                                except Exception as e:
+                                    print('Failed to dump yaml:',e)     
+
+                elif extension.lower() in ["yml","yaml","mcf"] and fn != "index":
                     if mode == "export":
                         ### export a file
                         try:
@@ -193,14 +240,12 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         # a yml should already exist for each spatial file, so only check yml's, not index
                         with open(str(file), mode="r", encoding="utf-8") as f:
                             orig = yaml.load(f, Loader=SafeLoader)
-                        print('Process record',str(file).split('.')[0])
+                        print('Process record',str(file))
                         # todo: if this fails, we give a warning, or initialise the file again??
                         if not orig:
                             orig = {}
-                        if 'distribution' not in orig or orig['distribution'] is None: 
-                            orig['distribution'] = {}
                         # find the relevant related file (introduced by init), first in distributions, then by any extension
-                        dataFN = orig.get('distribution').get('local',{}).get('url','').split('/').pop()
+                        dataFN = orig.get('distribution',{}).get('local',{}).get('url','').split('/').pop()
                         
                         # evaluate if a file is attached, or is only a metadata (of a wms for example)
                         hasFile = None
@@ -238,7 +283,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 crs = 4326
                             else:
                                 bnds = cnt.get('bounds',[])
-                                crs = cnt.get('crs','4326')
+                                crs = cnt.get('crs',4326)
                             orig['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
                             orig['content_info'] = cnt.get('content_info',{})
 
@@ -261,10 +306,10 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     'type' in v.keys() and 
                                     v['type'] not in [None,""] and (
                                         'wms' in v['type'].lower() or 
+                                        'csw' in v['type'].lower() or
                                         'wfs' in v['type'].lower()) and
                                     v['url'].split('?')[0] not in  hasProcessed):
                                     hasProcessed.append(v['url'].split('?')[0])
-                                    print('check distribution:',v.get('url',''),v.get('type',''),v.get('name',''))
                                     owsCapabs = checkOWSLayer(v.get('url',''),
                                                             v.get('type',''),
                                                             v.get('name',''), 
@@ -286,7 +331,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                 # see if their identification is unique, else consider them distributions of the same dataset
                                                 
                                                 # find identification of layer, else use 'unknown'
-                                                LayerID = l.get('metaidentifier','')
+                                                LayerID = l.get('metaidentifier',l.get('name',''))
                                                 #if LayerID in ('None',''):
                                                 #    LayerID = l.get('identifier','')
                                                 if LayerID in ('None',''):
@@ -309,8 +354,8 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                     if 'meta' in l:
                                                         myDatasets[LayerID] = l['meta']
                                                     else:
-                                                        myDatasets['LayerID'] = {
-                                                            'metadata': {'identifier': l.get('metaidentifier',l.get('identifier',nw['metadata']['identifier']))},
+                                                        myDatasets[LayerID] = {
+                                                            'metadata': {'identifier': safeFileName(LayerID)},
                                                             'identification': {
                                                                 'title': l.get('name',''),
                                                                 'abstract': l.get('abstract',''),
@@ -328,12 +373,18 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                                     'type': 'OGC:WMS' 
                                                             }}
                                                         }
+                                            
+
 
                                             # if only one, replace original
                                             if len(myDatasets.keys()) == 1:
                                                 md = list(myDatasets.values())[0]
                                                 dict_merge(md, nw)
                                                 nw=md
+                                                # remove all layer; todo: only if layers exist in capabs  
+                                                for k,v in nw.get('distribution',{}).items():
+                                                    if v.get('name','') == 'ALL':
+                                                        nw['distribution'].pop(k)
                                                 targetFile = str(file)
                                                 # restore original metadata identifier
                                                 nw['metadata']['identifier'] = orig['metadata'].get('identifier',nw['metadata']['identifier'])
@@ -380,12 +431,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 # mode==init
                 elif extension.lower() in GDCCONFIG["INDEX_FILE_TYPES"] and fn != "index":
                     # print ('Indexing file ' + fname)
-                    if (dir_out_mode=='flat'):
-                        outBase = os.path.join(dir_out,fn)
-                    else:    
-                        outBase = os.path.join(dir_out,relPath,fn)
-
-                    yf = os.path.join(outBase+'.yml')
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
                         cnt = indexFile(fname, extension) 
@@ -422,16 +467,17 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 # print('Skipping {}, no extension'.format(fname))
 
 
-def importCsv(dir,dir_out,map,sep,cluster,prefix):
+def importCsv(dir,dir_out,map,sep,enc,cluster,prefix):
     if sep in [None,'']:
         sep = ','
+    if enc in [None,'']:
+        enc = 'utf-8'
     for file in Path(dir).iterdir():
         fname = str(file).split(os.sep).pop()
         if not file.is_dir() and fname.endswith('.csv'):
             f,e = str(fname).rsplit('.', 1)
             # which mapping file to use?
             if map not in [None,""] and os.path.exists(map): # incoming param
-                print('template',map)
                 with open(map) as f1:
                     map = f1.read()
             elif os.path.exists(dir+os.sep+f+'.j2'): # same name, *.tpl
@@ -444,7 +490,7 @@ def importCsv(dir,dir_out,map,sep,cluster,prefix):
             env = Environment(extensions=['jinja2_time.TimeExtension'])
             j2_template = env.from_string(map)
 
-            myDatasets = pd.read_csv(file, sep=sep)
+            myDatasets = pd.read_csv(file, sep=sep, encoding=enc)
             for i, record in myDatasets.iterrows():
                 md = record.to_dict()
                 #Filter remove any None values
@@ -516,7 +562,9 @@ def insert_or_update(content, db, dbtype):
     # elif index = postgis
 
 def checkId(md, fn, prefix):
-    if md.get('metadata',{}).get('identifier','') in [None,'']: 
+    if md.get('metadata') in [None,'']:
+        md['metadata'] = {}
+    if md.get('metadata').get('identifier','') in [None,'']: 
         if md.get('metadata',{}).get('dataseturi','') != '': 
             myuuid = md.get('metadata',{}).get('dataseturi','').split("://").pop()
             domains = ["drive.google.com/file/d","doi.org","data.europa.eu","researchgate.net/publication","handle.net","osf.io","library.wur.nl","freegisdata.org/record"]

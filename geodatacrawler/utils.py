@@ -1,5 +1,6 @@
 from logging import NullHandler
 from unidecode import unidecode
+from bs4 import BeautifulSoup  
 import os
 import time
 import datetime
@@ -53,11 +54,15 @@ def indexFile(fname, extension):
             srcband = d.GetRasterBand(i+1) # raster bands counts from 1
             if not srcband.GetMinimum():
                 srcband.ComputeStatistics(0)
+            try:
+                noData = int(srcband.GetNoDataValue())
+            except: 
+                noData = None
             bands.append({
                     "name": srcband.GetDescription(),
                     "min": srcband.GetMinimum(),
                     "max": srcband.GetMaximum(),
-                    "nodata": int(srcband.GetNoDataValue() or 0),
+                    "nodata": noData,
                     "units": str(srcband.GetUnitType() or '')
             })
 
@@ -269,7 +274,7 @@ def checkOWSLayer(url, protocol, name, identifier, title):
                 if isinstance(name, str):
                     name = name.split(',')
                 for l in name: # name may contain multiple layers (or all)
-                    if name == 'ALL':
+                    if l == 'ALL':
                         matchedLayers = idf.get('distribution',{})
                     else:
                         for k,wl in idf.get('distribution',{}).items():
@@ -349,7 +354,6 @@ def parseExcelTraditional(file):
     import xlrd
     try:
         book = xlrd.open_workbook(file)
-        print(book.__dict__)
         return book.__dict__
     except Exception as e:
         print(f"Failed to read {file} as Spreadsheet; {str(e)}")
@@ -373,7 +377,7 @@ def prepCapabsResponse(CoreMD,lyrs):
                     mu = v['metadataUrls'][0]
                 md = fetchMetadata(mu['url'])
                         
-            if md:
+            if md not in [None,'']:
                 v['metaidentifier'] = md.get('metadata',{}).get('identifier','')
                 # todo: owslib does not capture the v.identifier element
                 v['meta'] = md
@@ -431,16 +435,66 @@ def fetchMetadata(u):
 
     if 'doi.org/' in u:
         try:
-            resp = fetchUrl("https://api.datacite.org/dois/"+u.split('doi.org/')[1])
+            doi = u.split('doi.org/').pop()
+
+            # some orgs are not in doi
+            if doi.split("/")[0] in GDCCONFIG["doi-prefix-not-in-datacite"]:
+                raise ValueError(f"Prefix {doi.split('/')[0]} assumed not present in datacite")
+
+            resp = fetchUrl("https://api.datacite.org/dois?query="+doi)
             if resp.status_code == 200:
-                md = parseDataCite(json.loads(resp.text),u)  
-                return md
+                md = json.loads(resp.text)
+                if md['data'] and len(md['data']) > 0:
+                    md2 = parseDataCite(md['data'][0],doi)  
+                    return md2
+                else:
+                    raise ValueError(f'doi {doi} not found in datacite')
+                    
             else:
-                print('doi 404', u) # todo: retrieve instead the citation
+                raise ValueError(f"Error fetch doi {doi} from datacite, Code: {resp.status_code}")
         except Exception as e:
-                print("Failed to fetch ",u.split('doi.org/').pop(),str(e),"trying bibtex")
-                #try:
-                if 0==0: 
+            print(f"Error fetch doi {doi}, {str(e)}. Trying DOI itself")
+            # fetch doi, it usually returns html, including metadata, but it can also return the resource itself (pdf/csv)
+            # see if html has <meta name="dc.title" ...>
+            try:
+                resp = fetchUrl(u)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, 'html.parser')
+                    md0 = {}
+                    title = soup.find("title")
+                    if title:
+                        md0['title'] = title.text  
+                    metas = soup.find_all("meta")  
+                    
+                    for meta in metas:
+                        if meta.has_attr('content'):
+                            if meta.has_attr('property'):
+                                md0[meta['property']] = meta['content']  
+                                # todo: dc.subject and dc.creator may be duplicated to indicate multiple keywords/authors, see https://link.springer.com/article/10.1007/s00216-019-01895-y
+                            elif meta.has_attr('name') and meta.has_attr('name') not in GDCCONFIG["exclude-html-metas"]:
+                                md0[meta['name']] = meta['content']  
+                            md2 = {} # convert og:title and dc.title to title, then merge back to md0
+                            for k in md0.keys(): # first try citation-syntax
+                                if k.split('_')[0] == 'citation' and len(k.split('_')) > 1 and len(k.split('_')[1].strip()) > 0:
+                                    md2[k.split('_')[1].strip()] = md0[k]
+                            for k in md0.keys(): # first try og
+                                if k.split(':')[0] == 'og' and len(k.split(':')) > 1 and len(k.split(':')[1].strip()) > 0:
+                                    md2[k.split(':')[1].strip()] = md0[k]
+                            for k in md0.keys(): # then try dc
+                                if k.split('.')[0] == 'dc' and len(k.split('.')) > 1 and len(k.split('.')[1].strip()) > 0:
+                                    md2[k.split('.')[1].strip()] = md0[k]
+                            for k in md2.keys():
+                                md0[k] = md2[k]
+                    if "description" in md0.keys() and "title" in md0.keys():
+                        return parseDataCite(md0,doi)
+                    else:
+                        raise ValueError("Failed getting enough html elements from DOI")
+                else: 
+                    raise ValueError("Failed getting html from doi")
+            except Exception as e:
+                print(f"Error fetch doi {doi}, {str(e)}. Trying bibtex")
+                try:
+                #if 0==0: 
                     import bibtexparser
                     resp = fetchUrl(u,{"Accept": "application/x-bibtex; charset=utf-8", 'User-agent': 'Mozilla/5.0'})
                     article = bibtexparser.parse_string(resp.text)
@@ -451,13 +505,13 @@ def fetchMetadata(u):
                             md[f.key] = f.value                     
                         return parseDC(md,md.get('title',safeFileName(u.split('doi.org/').pop())))
                     return None
-                #except Exception as e:
-                #    print("Failed to parse bibtex ",u,str(e))
+                except Exception as e:
+                    print("Failed to parse bibtex ",u,str(e))
 
     else:
         # Try a generic request
         try:
-            resp = fetchUrl(u)
+            resp = fetchUrl(u,{"accept":"application/xml"})
             restype = resp.headers['Content-Type']
             md = {}
             if (restype == 'application/json'):
@@ -543,19 +597,38 @@ def parseDC(dct,fname):
         dct['name'] = fname
     exp['identification']['title'] = dct['name']
     exp['metadata']['identifier'] = dct.get('identifier',safeFileName(exp['identification']['title']))
+    if isinstance(exp['metadata']['identifier'], list):
+        exp['metadata']['identifier'] = exp['metadata']['identifier'][0]
+    if exp['metadata']['identifier'].startswith('http'):
+        exp['metadata']['dataseturi'] = exp['metadata']['identifier'];
+        
     exp['identification']['abstract'] = dct.get('description','')
 
     exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', datetime.date.today())) 
+    ct3=[]
     for ct in "author,publisher,creator".split(','):    
-        for c in dct.get(ct,'').replace(' and ',';').split(';'):
-            print(c)
+        ct2 = dct.get(ct,'')
+        if isinstance(ct2, list):
+            ct3 += ct2
+        else:
+            ct3 += ct2.replace(' and ',';').split(';')
+        for c in ct3:
             if c.strip() == '':
                 None
-            if '@' in c:
+            elif '@' in c:
                 exp['contact'][safeFileName(c)] = {'email': c, 'role':ct}
             else:
                 exp['contact'][safeFileName(c)] = {'individualname': c, 'role':ct}
-    exp['identification']['keywords'] = {'default': {'keywords': [k for k in (dct.get('keywords','').split(',') + dct.get('subject','').split(',') + dct.get('category','').split(',')) if k]}}
+
+    ct4 = []
+    for ct in "keywords,subject,category".split(','):    
+            ct2 = dct.get(ct,'')
+            if isinstance(ct2, list):
+                ct4 += [k.strip() for k in ct2 if k != '']
+            else:
+                ct4 += [k.strip() for k in ct2.replace(',',';').split(';') if k != '']
+    exp['identification']['keywords'] = {'default': {'keywords': ct4}}
+
     exp['spatial']['datatype'] = dct.get('datatype','')
     exp['spatial']['geomtype'] = dct.get('geomtype','')
     exp['identification']['status'] = dct.get('contentStatus','' )
@@ -666,6 +739,7 @@ def fetchUrl(url,hdr=None):
         return req.get(url, headers=hdr, verify=False, timeout=5)
 
 def safeFileName(n):
+    n = str(n)
     if n not in [None,'']:
         ''' remove unsafe characters from a var to make it safe'''
         for i in ['(',')','[',']','{','}','&','~','%','+',',']:

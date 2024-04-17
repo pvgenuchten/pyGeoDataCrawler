@@ -74,17 +74,21 @@
     </gmd:MD_VectorSpatialRepresentation>
     {% endif %}
   </gmd:spatialRepresentationInfo>
+  {% if record['identification']['extents'].get('spatial') not in [None,''] %}
+  {% for rs in record['identification']['extents'].get('spatial',[]) %}
   <gmd:referenceSystemInfo>
     <gmd:MD_ReferenceSystem>
       <gmd:referenceSystemIdentifier>
         <gmd:RS_Identifier>
           <gmd:code>
-            <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ record['identification']['extents'].get('spatial',[{}])[0].get('crs','') | e }}</gco:CharacterString>
+            <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ rs.get('crs','') | e }}</gco:CharacterString>
           </gmd:code>
         </gmd:RS_Identifier>
       </gmd:referenceSystemIdentifier>
     </gmd:MD_ReferenceSystem>
   </gmd:referenceSystemInfo>
+  {% endfor %}
+  {% endif %}
   <gmd:identificationInfo>
     <gmd:MD_DataIdentification>
       <gmd:citation>
