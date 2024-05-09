@@ -486,8 +486,12 @@ def insert_or_update(content, db, dbtype):
     # elif index = postgis
 
 def checkId(md, fn, prefix):
-    if md.get('metadata',{}).get('identifier','') in [None,'']: 
-        if md.get('metadata',{}).get('dataseturi','') != '': 
+    if not md: 
+        md = {}
+    if md.get('metadata') in [None,'']:
+        md['metadata'] = {}
+    if md.get('metadata').get('identifier','') in [None,'']: 
+        if md.get('metadata',{}).get('dataseturi','') not in [None,'']: 
             myuuid = md.get('metadata',{}).get('dataseturi','').split("://").pop()
             domains = ["drive.google.com/file/d","doi.org","data.europa.eu","researchgate.net/publication","handle.net","osf.io","library.wur.nl","freegisdata.org/record"]
             for d in domains:
