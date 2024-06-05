@@ -91,7 +91,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "exceptiongroup"
-version = "1.2.0"
+version = "1.2.1"
 description = "Backport of PEP 654 (exception groups)"
 category = "main"
 optional = false
@@ -102,7 +102,7 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "gdal"
-version = "3.3.2"
+version = "3.6.4"
 description = "GDAL: Geospatial Data Abstraction Library"
 category = "main"
 optional = false
@@ -144,7 +144,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "jinja2"
-version = "3.1.3"
+version = "3.1.4"
 description = "A very fast and expressive template engine."
 category = "main"
 optional = false
@@ -178,7 +178,7 @@ python-versions = "*"
 
 [[package]]
 name = "jsonschema"
-version = "4.21.1"
+version = "4.22.0"
 description = "An implementation of JSON Schema validation for Python"
 category = "main"
 optional = false
@@ -338,7 +338,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "pluggy"
-version = "1.4.0"
+version = "1.5.0"
 description = "plugin and hook calling mechanisms for python"
 category = "main"
 optional = false
@@ -439,7 +439,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "referencing"
-version = "0.34.0"
+version = "0.35.1"
 description = "JSON Referencing + Python"
 category = "main"
 optional = false
@@ -469,7 +469,7 @@ use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "rpds-py"
-version = "0.18.0"
+version = "0.18.1"
 description = "Python bindings to Rust's persistent data structures (rpds)"
 category = "main"
 optional = false
@@ -536,7 +536,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-ena
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "a0b8b8600bac0af66c0fd15fa7eb946f06ea22a3395369102b8fdd4ba7adf38a"
+content-hash = "399da2d7ba7ff4e9aabddbf809baabda25d384414af788eb882685b0a20f011b"
 
 [metadata.files]
 arrow = []

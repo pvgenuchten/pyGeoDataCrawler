@@ -103,7 +103,9 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
     
     coreMetadata = merge_folder_metadata(parentMetadata, target_path, mode) 
 
-    cnf2 = coreMetadata.get('robot',{})
+    cnf2 = coreMetadata.get('robot')
+    if not cnf2:
+        cnf2 = {} 
 
     skipSubfolders = False
     if 'skip-subfolders' in cnf2:
@@ -199,7 +201,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 if canonicalUrl: # add a canonical url referencing the source record (facilitates: edit me on git)
                                     if 'canonical' not in target['distribution'] or target['distribution']['canonical'] is None:
                                         target['distribution']['canonical'] = {'url': canonicalUrl + relPath + os.sep + fn + '.yml', 'name': 'Source of the record', 'type': 'canonical', 'rel': 'canonical' }
-                                if target['contact'] is None or len(target['contact'].keys()) == 0:
+                                if not 'contact' in target or target['contact'] is None or len(target['contact'].keys()) == 0:
                                     target['contact'] = {'example':{'organization':'Unknown'}}
                                 if 'robot' in target:
                                     target.pop('robot')

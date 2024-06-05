@@ -17,6 +17,9 @@ import json
 import requests as req
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from geodatacrawler import GDCCONFIG
+import importlib.metadata
+
+
 
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
@@ -434,10 +437,9 @@ def fetchMetadata(u):
         return None
 
     if 'doi.org/' in u:
+        doi = u.split('doi.org/').pop()
         try:
-            doi = u.split('doi.org/').pop()
-
-            # some orgs are not in doi
+            # some orgs are not in datacite
             if doi.split("/")[0] in GDCCONFIG["doi-prefix-not-in-datacite"]:
                 raise ValueError(f"Prefix {doi.split('/')[0]} assumed not present in datacite")
 
@@ -453,44 +455,13 @@ def fetchMetadata(u):
             else:
                 raise ValueError(f"Error fetch doi {doi} from datacite, Code: {resp.status_code}")
         except Exception as e:
-            print(f"Error fetch doi {doi}, {str(e)}. Trying DOI itself")
-            # fetch doi, it usually returns html, including metadata, but it can also return the resource itself (pdf/csv)
-            # see if html has <meta name="dc.title" ...>
+            print(f"Error fetch doi {doi}, {str(e)}. Trying Crossref")
             try:
-                resp = fetchUrl(u)
+                resp = fetchUrl("https://api.crossref.org/works/"+doi)
                 if resp.status_code == 200:
-                    soup = BeautifulSoup(resp.text, 'html.parser')
-                    md0 = {}
-                    title = soup.find("title")
-                    if title:
-                        md0['title'] = title.text  
-                    metas = soup.find_all("meta")  
-                    
-                    for meta in metas:
-                        if meta.has_attr('content'):
-                            if meta.has_attr('property'):
-                                md0[meta['property']] = meta['content']  
-                                # todo: dc.subject and dc.creator may be duplicated to indicate multiple keywords/authors, see https://link.springer.com/article/10.1007/s00216-019-01895-y
-                            elif meta.has_attr('name') and meta.has_attr('name') not in GDCCONFIG["exclude-html-metas"]:
-                                md0[meta['name']] = meta['content']  
-                            md2 = {} # convert og:title and dc.title to title, then merge back to md0
-                            for k in md0.keys(): # first try citation-syntax
-                                if k.split('_')[0] == 'citation' and len(k.split('_')) > 1 and len(k.split('_')[1].strip()) > 0:
-                                    md2[k.split('_')[1].strip()] = md0[k]
-                            for k in md0.keys(): # first try og
-                                if k.split(':')[0] == 'og' and len(k.split(':')) > 1 and len(k.split(':')[1].strip()) > 0:
-                                    md2[k.split(':')[1].strip()] = md0[k]
-                            for k in md0.keys(): # then try dc
-                                if k.split('.')[0] == 'dc' and len(k.split('.')) > 1 and len(k.split('.')[1].strip()) > 0:
-                                    md2[k.split('.')[1].strip()] = md0[k]
-                            for k in md2.keys():
-                                md0[k] = md2[k]
-                    if "description" in md0.keys() and "title" in md0.keys():
-                        return parseDataCite(md0,doi)
-                    else:
-                        raise ValueError("Failed getting enough html elements from DOI")
-                else: 
-                    raise ValueError("Failed getting html from doi")
+                    md = json.loads(resp.text)
+                    return parseCrossref(md, doi)
+
             except Exception as e:
                 print(f"Error fetch doi {doi}, {str(e)}. Trying bibtex")
                 try:
@@ -526,6 +497,55 @@ def fetchMetadata(u):
             return md
         except Exception as e:
                 print("Failed to fetch",u,str(e))    
+
+def parseCrossref(md, u):
+    if 'message' in md:
+        if not 'published' in md['message']:
+            md['message']['published'] = md['message'].get('published-online')
+        md2 = {
+            'metadata': { 
+                'identifier': u,
+                'language': 'eng',
+                'hierarchylevel': md['message'].get('type','journal-article'),
+                'dataseturi': 'http://doi.org/'+u,
+                'datestamp': md['message'].get('indexed',{}).get('date-time','')
+            },
+            'identification': {
+                'title': md['message'].get('title',[''])[0],
+                'abstract': md['message'].get('abstract','').replace('jats:',''),
+                'dates': { 
+                    'creation':  md['message'].get('created',{}).get('date-time',''),
+                    'publication': str(md['message'].get('published',{}).get('date-parts',[])).replace('[','').replace(', ','-').replace(']','')
+                    },
+                'language': md['message'].get('language',''),
+                'license': { 'name': '', 'url': md['message'].get('license',[{}])[0].get('URL','') },
+                'keywords': {'default': {'keywords': md['message'].get('short-container-title', [])  }}
+            },
+            'contact': {
+                'publisher': {
+                    'role': 'publisher',
+                    'organization': md['message'].get('publisher','')
+                },
+            },
+            'distribution': {
+                'primary': {
+                    'name': md['message'].get('title',[''])[0],
+                    'type': 'application/pdf',
+                    'url': md['message'].get('resource',{}).get('primary',{}).get('URL','http://doi.org/'+u)
+                }
+            }
+        }
+        i=0
+        for a in md['message'].get('author',[]):
+            i+=1
+            md2['contact']['author'+str(i)] = {
+                'role': 'author',
+                'individualname': a.get('given','')+' '+a.get('family',''),
+                'organization': next(iter(a.get('affiliation',[])), {}).get('Name',''),
+                'url':  md['message'].get('ORCID','')
+            }
+        return md2
+    return None
 
 def parseDataCite(attrs, u):
     # some datacite embeds content in data.attributes
@@ -729,7 +749,9 @@ def owsCapabilities2md (url, protocol):
 
 def fetchUrl(url,hdr=None):
     if hdr in [None,'']:
-        hdr={'User-agent': 'Mozilla/5.0'}
+        version = importlib.metadata.version('geodatacrawler') or ''
+        contact = os.getenv('pgdc_contact') or ''
+        hdr={'User-agent': f'pyGeoDataCrawler {version};  (mailto:{contact})'}
     try:
         r = req.get(url, headers=hdr, timeout=5)
         r.raise_for_status()
