@@ -39,7 +39,7 @@ schemaPath = os.getenv('pgdc_schema_path') or os.path.join(os.path.dirname(__fil
               required=False, help="Directory as target for the generated files")
 @click.option('--dir-out-mode', nargs=1, required=False, help="nested|flat indicates if files in output folder are nested")
 @click.option('--mode', nargs=1, required=False, help="metadata mode init [update] [export] [import-csv]") 
-@click.option('--dbtype', nargs=1, required=False, help="export db type path [sqlite] [postgres]")  
+@click.option('--dbtype', nargs=1, required=False, help="export db type path")  
 @click.option('--profile', nargs=1, required=False, help="export to profile iso19139 [dcat] [stac] [oarec-record]")   
 @click.option('--db', nargs=1, required=False, help="a db to export to")           
 @click.option('--map', nargs=1, required=False, help="a mappingfile for csv")
