@@ -2,10 +2,8 @@ import click, yaml, xmltodict
 import importlib.resources as pkg_resources
 from yaml.loader import SafeLoader
 import os, traceback
-import sqlite3
 from os import path
 from copy import deepcopy
-from sqlite3 import Error
 import datetime
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema 
 from pygeometa.schemas.stac import STACItemOutputSchema
@@ -81,10 +79,7 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve
     print(mode + ' metadata in ' + dir + ' to ' + dir_out)
 
     if mode=="export":
-        if dbtype == 'sqlite':   
-            dir_out = os.path.join(dir_out, db)
-            createIndexIfDoesntExist(dir_out)
-        elif dbtype == "path": # default
+        if dbtype == "path": # default
             if not os.path.exists(dir_out): 
                 print('creating out folder ' + dir_out)
                 os.makedirs(dir_out)
@@ -226,9 +221,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                 else:
                                     iso_os = ISO19139OutputSchema()
                                     xml_string = iso_os.write(md)
-                                if dbtype == 'sqlite' or dbtype=='postgres':
-                                    insert_or_update(target, dir_out)
-                                elif dbtype == "path":
+                                if dbtype == "path":
                                     if dir_out_mode == "flat":
                                         pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.'+fext)
                                     else:
@@ -533,33 +526,6 @@ def importCsv(dir,dir_out,map,sep,enc,cluster,prefix):
                     with open(os.path.join(fldr,fn+'.yml'), 'w+') as f:
                         yaml.dump(yMcf, f, sort_keys=False)
 
-def insert_or_update(content, db, dbtype):
-    """ run a query """
-    try:
-        if dbtype == 'sqlite':
-            conn = sqlite3.connect(db)
-        elif dbtype=='postgres':
-            conn = None
-
-        c = conn.cursor()
-
-        rows = c.execute("select identifier from records where identifier = '" + content["identifier"] + "'").fetchall()
-
-        if len(rows) < 1:
-            c.execute('INSERT into records (identifier, title, crs, type, bounds) values (?,?,?,?,?);', (
-                content["identifier"], content.get("name", content["identifier"]),
-                content.get("crs", ""), str(content.get("type", "")), str(content.get("bounds", ""))))
-        else:
-            c.execute('UPDATE records set title=?, crs=?, type=?, bounds=? where identifier = ?;', (
-                content["name"], content["identifier"], content.get("crs", ""),
-                str(content.get("type", "")), str(content.get("bounds", ""))))
-        conn.commit()
-    except Error as e:
-        print('Failed inserting in db',e)
-    finally:
-        if conn:
-            conn.close()
-
     return True
     # elif index = postgis
 
@@ -603,16 +569,6 @@ def load_default_metadata(mode):
         initial['metadata'] = {} 
     initial['metadata']['datestamp'] = datetime.date.today()
     return initial
-
-def createIndexIfDoesntExist(db):
-    if path.exists(db):
-        print('database ' + db + ' exists')
-    else:
-        print('database ' + db + ' does not exists, creating...')
-        newFile = open(db, "wb")
-        newFile.write(pkg_resources.read_binary(templates, 'index.sqlite'))
-    return True
-
 
     # fetch the url
 

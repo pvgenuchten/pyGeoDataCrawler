@@ -447,11 +447,9 @@ def fetchMetadata(u):
             if resp.status_code == 200:
                 md = json.loads(resp.text)
                 if md['data'] and len(md['data']) > 0:
-                    md2 = parseDataCite(md['data'][0],doi)  
-                    return md2
+                    return parseDataCite(md['data'][0],doi)  
                 else:
-                    raise ValueError(f'doi {doi} not found in datacite')
-                    
+                    raise ValueError(f'doi {doi} not found in datacite')    
             else:
                 raise ValueError(f"Error fetch doi {doi} from datacite, Code: {resp.status_code}")
         except Exception as e:
@@ -461,7 +459,6 @@ def fetchMetadata(u):
                 if resp.status_code == 200:
                     md = json.loads(resp.text)
                     return parseCrossref(md, doi)
-
             except Exception as e:
                 print(f"Error fetch doi {doi}, {str(e)}. Trying bibtex")
                 try:
@@ -558,6 +555,7 @@ def parseDataCite(attrs, u):
         'identification': {
             'title': arrit(attrs,'titles',{}).get('title',''),
             'abstract': arrit(attrs,'descriptions',{}).get('description',''),
+            'license': {'name': arrit(attrs,'licenses',{}).get('title','')},
             'dates': {}
         },
         'contact': DOIContactstoMCF(attrs.get('creators',[]) + attrs.get('contributors',[])),
@@ -685,12 +683,12 @@ def parseISO(strXML, u):
         md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
         strXML = etree.tostring(md[0])
 
-    try:
-        iso_os = ISO19139OutputSchema()
-        md = iso_os.import_(strXML)
-        return md
-    except Exception as e:
-        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+    #try:
+    iso_os = ISO19139OutputSchema()
+    md = iso_os.import_(strXML)
+    return md
+    #except Exception as e:
+    #    print('no iso19139 at',u,e) # could parse url to find param id (csw request)
 
 
 def owsCapabilities2md (url, protocol):

@@ -260,14 +260,6 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "numpy"
-version = "1.24.4"
-description = "Fundamental package for array computing in Python"
-category = "main"
-optional = false
-python-versions = ">=3.8"
-
-[[package]]
-name = "numpy"
 version = "1.26.4"
 description = "Fundamental package for array computing in Python"
 category = "main"
@@ -350,7 +342,7 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "pygeometa"
-version = "0.13.1"
+version = "0.16.0"
 description = "pygeometa is a Python package to generate metadata for geospatial datasets"
 category = "main"
 optional = false
@@ -382,14 +374,6 @@ python-versions = ">=3.8"
 
 [package.dependencies]
 certifi = "*"
-
-[[package]]
-name = "pysqlite3"
-version = "0.4.8"
-description = "DB-API 2.0 interface for Sqlite 3.x"
-category = "main"
-optional = false
-python-versions = "*"
 
 [[package]]
 name = "pytest"
@@ -536,7 +520,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-ena
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "399da2d7ba7ff4e9aabddbf809baabda25d384414af788eb882685b0a20f011b"
+content-hash = "d655cc431eb6de7b4ed3d83c15796dd23548d5122f44b5e9d51a1bdb222a82bb"
 
 [metadata.files]
 arrow = []
@@ -571,7 +555,6 @@ pluggy = []
 pygeometa = []
 pylatexenc = []
 pyproj = []
-pysqlite3 = []
 pytest = []
 python-dateutil = []
 pytz = []
