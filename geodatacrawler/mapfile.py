@@ -128,7 +128,8 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                 base, extension = str(file).rsplit('.', 1)
                 fn = base.split(os.sep).pop()
 
-                # do we trigger on ymls only, or also on spatial files? to go back to the file from the yml works via distribution(s)?
+                # do we trigger on ymls only, or also on spatial files? --> No 
+                # to go back to the file from the yml works via name matching or distribution(s)?
                 if extension.lower() in ["yml","yaml"] and fn != "index":
                     # todo: operational metadata contains information on how to process the folder
                     
@@ -178,6 +179,10 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     fileinfo['type'] = 'point'
                                 else:
                                     fileinfo['type'] = 'polygon'
+                                # check if a SLD exists
+                                sld = None
+                                if (os.path.exists(str(file).replace('yml','sld'))):
+                                    sld = os.path.exists(str(file).replace('yml','sld'))
 
                                 # bounds_wgs84 also exists, but often empty
                                 # else cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('bbox')
@@ -205,7 +210,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0]
                                 new_class_string2 = ""
 
-                                if 'styles' in ly.keys() and isinstance(ly['styles'],list):
+                                if sld: # reference sld file in current folder
+                                    new_class_string2 += f"STYLEITEM: \"sld://{sld}\"\n"
+                                elif 'styles' in ly.keys() and isinstance(ly['styles'],list):
                                     for style_reference in ly.get("styles", []): 
                                         # if isinstance(style_reference,dict): 
                                         #    new_class_string2 += f"CLASSGROUP \"{style_reference.get('name','Default')}\"\n"
