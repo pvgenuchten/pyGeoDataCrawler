@@ -109,9 +109,9 @@ robot:
       END
 ```
 
-For grids, several additional options exist:
+Or style your layer explicitely. Note that you can define multiple styles per layer, the last is used as default:
 
-- A range of colors, the min-max range of the band is devided by the number of colors. Note that you can define multiple styles per layer, the last is used as default.
+- A range of colors (grid only), the min-max range of the first band is devided by the number of colors.
 
 ```yaml
 robot:
@@ -130,6 +130,7 @@ robot:
   map:
     styles:
       - name: rainbow
+        property: length # name of the column, vector only
         classes: 
           - label: True
             val: 1
@@ -146,6 +147,7 @@ robot:
   map:
     styles:
       - name: Scale
+        property: length # name of the column, vector only
         classes: 
           - label: Low
             min: 0

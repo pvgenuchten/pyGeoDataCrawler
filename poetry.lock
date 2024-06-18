@@ -16,7 +16,7 @@ test = ["dateparser (>=1.0.0,<2.0.0)", "pre-commit", "pytest", "pytest-cov", "py
 
 [[package]]
 name = "attrs"
-version = "23.1.0"
+version = "23.2.0"
 description = "Classes Without Boilerplate"
 category = "main"
 optional = false
@@ -27,22 +27,28 @@ cov = ["attrs", "coverage[toml] (>=5.3)"]
 dev = ["attrs", "pre-commit"]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-notfound-page", "sphinxcontrib-towncrier", "towncrier", "zope-interface"]
 tests = ["attrs", "zope-interface"]
-tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pytest-mypy-plugins", "pytest-xdist", "pytest (>=4.3.0)"]
+tests-mypy = ["mypy (>=1.6)", "pytest-mypy-plugins"]
+tests-no-zope = ["attrs", "cloudpickle", "hypothesis", "pympler", "pytest-xdist", "pytest (>=4.3.0)"]
 
 [[package]]
 name = "bibtexparser"
-version = "1.4.1"
+version = "2.0.0b7"
 description = "Bibtex parser for python 3"
 category = "main"
 optional = false
 python-versions = "*"
 
 [package.dependencies]
-pyparsing = ">=2.0.3"
+pylatexenc = ">=2.10"
+
+[package.extras]
+docs = ["sphinx"]
+lint = ["black (==23.3.0)", "isort (==5.12.0)", "docstr-coverage (==2.2.0)"]
+test = ["pytest", "pytest-xdist", "pytest-cov", "jupyter"]
 
 [[package]]
 name = "certifi"
-version = "2023.11.17"
+version = "2024.2.2"
 description = "Python package for providing Mozilla's CA Bundle."
 category = "main"
 optional = false
@@ -85,7 +91,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "exceptiongroup"
-version = "1.2.0"
+version = "1.2.1"
 description = "Backport of PEP 654 (exception groups)"
 category = "main"
 optional = false
@@ -96,7 +102,7 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "gdal"
-version = "3.8.1"
+version = "3.6.4"
 description = "GDAL: Geospatial Data Abstraction Library"
 category = "main"
 optional = false
@@ -107,7 +113,7 @@ numpy = ["numpy (>1.0.0)"]
 
 [[package]]
 name = "idna"
-version = "3.6"
+version = "3.7"
 description = "Internationalized Domain Names in Applications (IDNA)"
 category = "main"
 optional = false
@@ -115,7 +121,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "importlib-resources"
-version = "6.1.1"
+version = "6.4.0"
 description = "Read resources from Python packages"
 category = "main"
 optional = false
@@ -126,7 +132,7 @@ zipp = {version = ">=3.1.0", markers = "python_version < \"3.10\""}
 
 [package.extras]
 docs = ["sphinx (>=3.5)", "sphinx (<7.2.5)", "jaraco.packaging (>=9.3)", "rst.linker (>=1.9)", "furo", "sphinx-lint", "jaraco.tidelift (>=1.4)"]
-testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ruff", "zipp (>=3.17)", "pytest-black (>=0.3.7)", "pytest-mypy (>=0.9.1)"]
+testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ruff (>=0.2.1)", "zipp (>=3.17)", "jaraco.test (>=5.4)", "pytest-mypy"]
 
 [[package]]
 name = "iniconfig"
@@ -138,7 +144,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "jinja2"
-version = "3.1.2"
+version = "3.1.4"
 description = "A very fast and expressive template engine."
 category = "main"
 optional = false
@@ -172,7 +178,7 @@ python-versions = "*"
 
 [[package]]
 name = "jsonschema"
-version = "4.20.0"
+version = "4.22.0"
 description = "An implementation of JSON Schema validation for Python"
 category = "main"
 optional = false
@@ -192,7 +198,7 @@ format-nongpl = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-
 
 [[package]]
 name = "jsonschema-specifications"
-version = "2023.11.2"
+version = "2023.12.1"
 description = "The JSON Schema meta-schemas and vocabularies, exposed as a Registry"
 category = "main"
 optional = false
@@ -217,17 +223,18 @@ regex = ["regex"]
 
 [[package]]
 name = "lxml"
-version = "4.9.3"
+version = "5.2.1"
 description = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, != 3.4.*"
+python-versions = ">=3.6"
 
 [package.extras]
 cssselect = ["cssselect (>=0.7)"]
 html5 = ["html5lib"]
+html-clean = ["lxml-html-clean"]
 htmlsoup = ["beautifulsoup4"]
-source = ["Cython (>=0.29.35)"]
+source = ["Cython (>=3.0.10)"]
 
 [[package]]
 name = "mappyfile"
@@ -245,7 +252,7 @@ lark-parser = ">=0.11.3"
 
 [[package]]
 name = "markupsafe"
-version = "2.1.3"
+version = "2.1.5"
 description = "Safely add untrusted strings to HTML/XML markup."
 category = "main"
 optional = false
@@ -253,15 +260,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "numpy"
-version = "1.24.4"
-description = "Fundamental package for array computing in Python"
-category = "main"
-optional = false
-python-versions = ">=3.8"
-
-[[package]]
-name = "numpy"
-version = "1.26.2"
+version = "1.26.4"
 description = "Fundamental package for array computing in Python"
 category = "main"
 optional = false
@@ -280,13 +279,14 @@ et-xmlfile = "*"
 
 [[package]]
 name = "owslib"
-version = "0.27.2"
+version = "0.30.0"
 description = "OGC Web Service utility library"
 category = "main"
 optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
+lxml = "*"
 python-dateutil = ">=1.5"
 pytz = "*"
 pyyaml = "*"
@@ -294,7 +294,7 @@ requests = ">=1.0"
 
 [[package]]
 name = "packaging"
-version = "23.2"
+version = "24.0"
 description = "Core utilities for Python packages"
 category = "main"
 optional = false
@@ -330,7 +330,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "pluggy"
-version = "1.3.0"
+version = "1.5.0"
 description = "plugin and hook calling mechanisms for python"
 category = "main"
 optional = false
@@ -342,7 +342,7 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "pygeometa"
-version = "0.13.1"
+version = "0.16.0"
 description = "pygeometa is a Python package to generate metadata for geospatial datasets"
 category = "main"
 optional = false
@@ -357,15 +357,12 @@ OWSLib = "*"
 pyyaml = "*"
 
 [[package]]
-name = "pyparsing"
-version = "3.1.1"
-description = "pyparsing module - Classes and methods to define and execute parsing grammars"
+name = "pylatexenc"
+version = "2.10"
+description = "Simple LaTeX parser providing latex-to-unicode and unicode-to-latex conversion"
 category = "main"
 optional = false
-python-versions = ">=3.6.8"
-
-[package.extras]
-diagrams = ["railroad-diagrams", "jinja2"]
+python-versions = "*"
 
 [[package]]
 name = "pyproj"
@@ -379,16 +376,8 @@ python-versions = ">=3.8"
 certifi = "*"
 
 [[package]]
-name = "pysqlite3"
-version = "0.4.8"
-description = "DB-API 2.0 interface for Sqlite 3.x"
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "pytest"
-version = "7.4.3"
+version = "7.4.4"
 description = "pytest: simple powerful testing with Python"
 category = "main"
 optional = false
@@ -407,7 +396,7 @@ testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "no
 
 [[package]]
 name = "python-dateutil"
-version = "2.8.2"
+version = "2.9.0.post0"
 description = "Extensions to the standard Python datetime module"
 category = "main"
 optional = false
@@ -418,7 +407,7 @@ six = ">=1.5"
 
 [[package]]
 name = "pytz"
-version = "2023.3.post1"
+version = "2024.1"
 description = "World timezone definitions, modern and historical"
 category = "main"
 optional = false
@@ -434,7 +423,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "referencing"
-version = "0.31.1"
+version = "0.35.1"
 description = "JSON Referencing + Python"
 category = "main"
 optional = false
@@ -464,7 +453,7 @@ use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "rpds-py"
-version = "0.13.2"
+version = "0.18.1"
 description = "Python bindings to Rust's persistent data structures (rpds)"
 category = "main"
 optional = false
@@ -488,15 +477,23 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "types-python-dateutil"
-version = "2.8.19.14"
+version = "2.9.0.20240316"
 description = "Typing stubs for python-dateutil"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.8"
+
+[[package]]
+name = "unidecode"
+version = "1.3.8"
+description = "ASCII transliterations of Unicode text"
+category = "main"
+optional = false
+python-versions = ">=3.5"
 
 [[package]]
 name = "urllib3"
-version = "2.1.0"
+version = "2.2.1"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 category = "main"
 optional = false
@@ -504,25 +501,26 @@ python-versions = ">=3.8"
 
 [package.extras]
 brotli = ["brotli (>=1.0.9)", "brotlicffi (>=0.8.0)"]
+h2 = ["h2 (>=4,<5)"]
 socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "zipp"
-version = "3.17.0"
+version = "3.18.1"
 description = "Backport of pathlib-compatible object wrapper for zip files"
 category = "main"
 optional = false
 python-versions = ">=3.8"
 
 [package.extras]
-docs = ["sphinx (>=3.5)", "sphinx (<7.2.5)", "jaraco.packaging (>=9.3)", "rst.linker (>=1.9)", "furo", "sphinx-lint", "jaraco.tidelift (>=1.4)"]
-testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ruff", "jaraco.itertools", "jaraco.functools", "more-itertools", "big-o", "pytest-ignore-flaky", "pytest-black (>=0.3.7)", "pytest-mypy (>=0.9.1)"]
+docs = ["sphinx (>=3.5)", "jaraco.packaging (>=9.3)", "rst.linker (>=1.9)", "furo", "sphinx-lint", "jaraco.tidelift (>=1.4)"]
+testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ruff (>=0.2.1)", "jaraco.itertools", "jaraco.functools", "more-itertools", "big-o", "pytest-ignore-flaky", "pytest-mypy"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "c81e7fadb1c883c0243c3a0c8a19d5085322a757ca11ba9f2c53b7eb2d388b0d"
+content-hash = "d655cc431eb6de7b4ed3d83c15796dd23548d5122f44b5e9d51a1bdb222a82bb"
 
 [metadata.files]
 arrow = []
@@ -555,9 +553,8 @@ pandas = []
 pkgutil-resolve-name = []
 pluggy = []
 pygeometa = []
-pyparsing = []
+pylatexenc = []
 pyproj = []
-pysqlite3 = []
 pytest = []
 python-dateutil = []
 pytz = []
@@ -568,5 +565,6 @@ rpds-py = []
 six = []
 tomli = []
 types-python-dateutil = []
+unidecode = []
 urllib3 = []
 zipp = []
