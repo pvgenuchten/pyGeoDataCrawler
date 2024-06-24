@@ -91,9 +91,16 @@ A [mapserver docker](https://github.com/camptocamp/docker-mapserver) image is pr
 
 ### Layer styling
 
-You can now set dedicated layer styling for grids and vectors.
+You can now set dedicated layer styling for grids and vectors. Note that you can define multiple styles per layer, the last is used as default:
 
-- Add mapserver mapfile syntax to the mcf robot section
+### SLD
+
+Starting from [Mapserver 8.2](https://github.com/MapServer/MapServer/tree/rel-8-2-0) SLD can directly be referenced from mapfiles for layer styling.
+If the crawler notices a file with the same name as the dataset, but with extension `.sld`, it will reference that file for layer styling. Notice that you can export sld from any QGIS layer. 
+
+### Mapfile syntax
+
+Add mapserver mapfile syntax to the mcf robot section
 
 ```yaml
 robot:
@@ -109,7 +116,9 @@ robot:
       END
 ```
 
-Or style your layer explicitely. Note that you can define multiple styles per layer, the last is used as default:
+### YAML syntax
+
+For various layer types, various options exits. 
 
 - A range of colors (grid only), the min-max range of the first band is devided by the number of colors.
 
@@ -194,7 +203,7 @@ GDAL 3.3.2, released 2021/09/01
 
 ### Release
 
-- update [__init__.py](__init__.py) and [pyporoject.toml](pyproject.toml)
+- update [__init__.py](__init__.py) and [pyproject.toml](pyproject.toml)
 - push changes
 - trigger semantic release
 - poetry build
