@@ -13,7 +13,6 @@ from pygeometa.core import read_mcf, render_j2_template
 from geodatacrawler.utils import indexFile, dict_merge, isDistributionLocal, checkOWSLayer, fetchMetadata, safeFileName, parseDC, parseISO
 from geodatacrawler import GDCCONFIG
 from pathlib import Path
-import pandas as pd
 import uuid
 from jinja2 import Environment
 import re
@@ -141,6 +140,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 #relPath=base.replace(root,'')
                 if extension.lower() in ["xml"] and fn != "index":
                     if mode == "init":
+                        md=None
                         with open(str(file), mode="r", encoding="utf-8") as f:
                             fc = f.read()
                             if 'MD_Metadata' in fc:
@@ -239,6 +239,10 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                         # todo: if this fails, we give a warning, or initialise the file again??
                         if not orig:
                             orig = {}
+
+                        # orig config
+                        cnf = orig.get('robot',{})
+                           
                         # find the relevant related file (introduced by init), first in distributions, then by any extension
                         dataFN = orig.get('distribution',{}).get('local',{}).get('url','').split('/').pop()
                         
@@ -309,7 +313,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                                             v.get('type',''),
                                                             v.get('name',''), 
                                                             orig.get('metadata',{}).get('identifier'), 
-                                                            orig.get('identification',{}).get('title'))
+                                                            orig.get('identification',{}).get('title'), cnf)
                                     if owsCapabs and 'distribution' in owsCapabs:
                                         hasFiles = owsCapabs['distribution']
                                         myDatasets = {}
@@ -429,7 +433,9 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
                         cnt = indexFile(fname, extension) 
+                        print('foo',cnt)
                         md = parseDC(cnt,fname)
+                        print('foo2',md)
                         checkId(md,str(os.path.join(relPath,fn)).replace(os.sep,'-'),prefix)
                         if 'identification' not in md or md['identification'] is None:
                             md['identification'] = {}
@@ -462,7 +468,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 # print('Skipping {}, no extension'.format(fname))
 
 
-def importCsv(dir,dir_out,map,sep,enc,cluster,prefix):
+def importCsv(dir,dir_out,map='',sep='',enc='',cluster='',prefix=''):
     if sep in [None,'']:
         sep = ','
     if enc in [None,'']:
@@ -485,46 +491,58 @@ def importCsv(dir,dir_out,map,sep,enc,cluster,prefix):
             env = Environment(extensions=['jinja2_time.TimeExtension'])
             j2_template = env.from_string(map)
 
-            myDatasets = pd.read_csv(file, sep=sep, encoding=enc)
-            for i, record in myDatasets.iterrows():
-                md = record.to_dict()
-                #Filter remove any None values
-                md = {k:v for k, v in md.items() if pd.notna(v)}
-                # for each row, substiture values in a yml
-                try:    
-                    mcf = j2_template.render(md=md)
-                    #print(mcf)
-                    try:
-                        yMcf = yaml.load(mcf, Loader=SafeLoader)
-                    except Error as e:
-                        print('Failed parsing',mcf,e)
-                except Error as e:
-                    print('Failed substituting',md,e)    
-                if yMcf:
-                    # which folder to write to?
-                    fldr = dir_out
-                    if cluster not in [None,""] and cluster in md.keys():
-                        # todo, safe string, re.sub('[^A-Za-z0-9]+', '', cluster)
-                        fldr = os.path.join(fldr, md[cluster])
-                    if not os.path.isdir(fldr):
-                        os.makedirs(fldr)
-                        print('folder',fldr,'created')
-                    # which id to use
-                    # check identifier
-                    checkId(yMcf,'',prefix)
-                    myid = yMcf['metadata']['identifier']
-                    fn = safeFileName(myid)
-                    if len(fn) > 32:
-                        fn = fn[:32]
-                    elif len(fn) < 16: ## extent title with organisation else part of abstract
-                        letters = yMcf['identification'].get('abstract')
-                        for c in yMcf.get('contact',{}).keys():
-                            letters = yMcf['contact'][c].get('organization',yMcf['contact'][c].get('individualname','None'))
-                        fn = fn+'-'+'-'+safeFileName(letters)[:16]
-                    # write out the yml
-                    print("Save to file",os.path.join(fldr,fn+'.yml'))
-                    with open(os.path.join(fldr,fn+'.yml'), 'w+') as f:
-                        yaml.dump(yMcf, f, sort_keys=False)
+            import csv
+            with open(file, newline='', encoding=enc) as csvfile:
+                rd = csv.reader(csvfile, delimiter=sep)
+                cols=None
+                for row in rd:
+                    if not cols:
+                        cols = row
+                    else:
+                        md = {}
+                        for i in range(len(cols)):
+                            if len(row) > i: # some rows shorter then header
+                                md[cols[i]] = row[i] or ''
+                            else:
+                                md[cols[i]] = ''
+                        #Filter remove any None values
+                        # md = {k:v for k, v in md.items() if pd.notna(v)}
+                        # for each row, substiture values in a yml
+                        yMcf = None
+                        try:    
+                            mcf = j2_template.render(md=md)
+                            #print(mcf)
+                            try:
+                                yMcf = yaml.load(mcf, Loader=SafeLoader)
+                            except Exception as e:
+                                print('Failed parsing',mcf,e)
+                        except Exception as e:
+                            print('Failed substituting',md,e)    
+                        if yMcf:
+                            # which folder to write to?
+                            fldr = dir_out
+                            if cluster not in [None,""] and cluster in md.keys():
+                                # todo, safe string, re.sub('[^A-Za-z0-9]+', '', cluster)
+                                fldr = os.path.join(fldr, md[cluster])
+                            if not os.path.isdir(fldr):
+                                os.makedirs(fldr)
+                                print('folder',fldr,'created')
+                            # which id to use
+                            # check identifier
+                            checkId(yMcf,'',prefix)
+                            myid = yMcf['metadata']['identifier']
+                            fn = safeFileName(myid)
+                            if len(fn) > 32:
+                                fn = fn[:32]
+                            elif len(fn) < 16: ## extent title with organisation else part of abstract
+                                letters = yMcf['identification'].get('abstract')
+                                for c in yMcf.get('contact',{}).keys():
+                                    letters = yMcf['contact'][c].get('organization',yMcf['contact'][c].get('individualname','None'))
+                                fn = fn+'-'+'-'+safeFileName(letters)[:16]
+                            # write out the yml
+                            print("Save to file",os.path.join(fldr,fn+'.yml'))
+                            with open(os.path.join(fldr,fn+'.yml'), 'w+') as f:
+                                yaml.dump(yMcf, f, sort_keys=False)
 
     return True
     # elif index = postgis

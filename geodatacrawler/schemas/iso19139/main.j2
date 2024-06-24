@@ -76,6 +76,7 @@
   </gmd:spatialRepresentationInfo>
   {% if record['identification']['extents'].get('spatial') not in [None,''] %}
   {% for rs in record['identification']['extents'].get('spatial',[]) %}
+  {% if rs %}
   <gmd:referenceSystemInfo>
     <gmd:MD_ReferenceSystem>
       <gmd:referenceSystemIdentifier>
@@ -87,6 +88,7 @@
       </gmd:referenceSystemIdentifier>
     </gmd:MD_ReferenceSystem>
   </gmd:referenceSystemInfo>
+  {% endif %}
   {% endfor %}
   {% endif %}
   <gmd:identificationInfo>

@@ -4,7 +4,7 @@ from importlib.resources import path
 from copy import deepcopy
 from decimal import *
 import mappyfile, click, yaml
-import os, time, sys, re, math
+import os, time, sys, re, math, glob
 import pprint
 import urllib.request
 from geodatacrawler.utils import indexFile, dict_merge
@@ -111,9 +111,10 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
     mf["web"]["metadata"]["ows_onlineresource"] = config['msUrl'] + mf["name"]
     mf["web"]["metadata"]["oga_onlineresource"] = mf["web"]["metadata"]["ows_onlineresource"] + '/ogcapi'
 
-    for file in Path(os.path.join(config['rootDir'],relPath)).iterdir():
+    filelist = glob.glob(os.path.join(config['rootDir'],relPath)+os.sep+'*')
+    for file in sorted(filelist): 
         fname = str(file).split(os.sep).pop()
-        if file.is_dir() and recursive and not fname.startswith('.'):
+        if os.path.isdir(str(file)) and recursive and not fname.startswith('.'):
             if skipSubfolders:
                 print('Skip path: '+ str(file))
             else:
@@ -310,9 +311,10 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 Verify if this metadata already has a link to this service
 '''
 def checkLink(md, type, config):
-    for k,v in md.get('distribution',{}).items():
-        if v.get('type','').upper() == type and v.get('url','').startswith(config['msUrl']):
-            return True
+    if 'distribution' in md and md['distribution']:
+        for k,v in md.get('distribution').items():
+            if v.get('type','').upper() == type and v.get('url','').startswith(config['msUrl']):
+                return True
     return False
  
 '''
@@ -324,7 +326,7 @@ def addLink(type, layer, file, relPath, map, config):
     with open(str(file), mode="r", encoding="utf-8") as f:
         orig = yaml.load(f, Loader=SafeLoader)
     # add link
-        if 'distribution' not in orig.keys():
+        if 'distribution' not in orig.keys() or orig['distribution'] is None:
             orig['distribution'] = {}
         msUrl2 = config['msUrl'] + (relPath if relPath != '' else '')
         orig['distribution'][type.split(':').pop()] = {
@@ -439,7 +441,9 @@ def msStyler(geomtype,cls):
 if color is rgb, return as hex
 '''
 def hexcolor(clr):
-    if isinstance(clr,list):
+    if clr in [None,'']:
+        return "#CCCCCC"
+    elif isinstance(clr,list):
         return '#{:02x}{:02x}{:02x}'.format(int(clr[0]),int(clr[1]),int(clr[2]))
     elif len(clr.split(' ')) == 3:
         return hexcolor(clr.split(' '))

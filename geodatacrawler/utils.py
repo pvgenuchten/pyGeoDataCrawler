@@ -80,10 +80,13 @@ def indexFile(fname, extension):
         crs = crs2code(d.GetProjection())
         content['crs'] = crs
 
+        meta = d.GetMetadata()
+        dict_merge(content,meta)
+
         content['content_info'] = {
                 'type': 'image',
                 'dimensions': bands,
-                'meta':  d.GetMetadata()
+                'meta':  meta
             }
         d = None
 
@@ -218,7 +221,7 @@ def reprojectBounds(bnds,source,trg):
 '''
 fetch ows capabilities and check if layer exists, returns distribution object with matched layers from wms
 '''
-def checkOWSLayer(url, protocol, name, identifier, title):
+def checkOWSLayer(url, protocol, name, identifier, title, cnf):
     if url in [None,''] or protocol in [None,'']:
         print('no input:',url,protocol)
         return {}
@@ -311,29 +314,16 @@ def checkOWSLayer(url, protocol, name, identifier, title):
             # not found matched layer?
                 # suggestion for a layer?? 
     elif 'CSW' in protocol.upper():  
-        from owslib.csw import CatalogueServiceWeb
-        from owslib.fes import PropertyIsEqualTo, PropertyIsLike, BBox
-        csw = CatalogueServiceWeb(url)
 
-        # qry = PropertyIsEqualTo('csw:AnyText', 'soil')
-        nextRecord = 1
-        returned = 1
-        recs = {}
-        while nextRecord > 0 and returned > 0:
-            csw.getrecords2(maxrecords=250,outputschema='http://www.isotc211.org/2005/gmd',startposition=nextRecord)
-            print('CSW query ' + str(csw.results['returned']) + ' of ' + str(csw.results['matches']) + ' records from ' + str(nextRecord) + '.')
-            nextRecord = csw.results['nextrecord']
-            returned = csw.results['returned']
-            
-            for rec in csw.records:
-                try:
-                    md = {'metaidentifier': csw.records[rec].identifier}
-                    md['meta'] = parseISO(csw.records[rec].xml,url.split('?')[0]+'?service=CSW&version=2.0.1&request=GetRecordbyID&id='+csw.records[rec].identifier)
-                    recs[csw.records[rec].identifier] = md
-                    
-                except Exception as e:
-                    print(f"Parse CSW results failed ; {str(e)}")
-        capmd['distribution'] = recs
+        constraints = cnf.get('harvest',{}).get('filter',{})
+        pagesize = cnf.get('harvest',{}).get('pagesize', 50)
+        maxrecords = cnf.get('harvest',{}).get('maxrecords', 250)
+        
+        records = harvestCSW(url, constraints, pagesize, maxrecords)
+        if records and len(records) > 0:
+            capmd['distribution'] = recs
+        else:
+            print(f'No records harvested from {url}, using filter {filter}')
         return capmd
 
     elif 'WFS' in protocol.upper():  
@@ -343,6 +333,48 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         print(protocol,'not implemented',url,identifier)
     
     return None
+
+def harvestCSW(url, filter, pagesize, maxrecords):
+    
+    from owslib.csw import CatalogueServiceWeb
+    from owslib.fes import PropertyIsEqualTo, PropertyIsLike, BBox
+    csw = CatalogueServiceWeb(url)
+
+    # qry = PropertyIsEqualTo('csw:AnyText', 'soil')
+    nextRecord = 1
+    returned = 1
+    recs = {}
+
+    filterMapping = {
+        "any": 'csw:AnyText',
+        "title": 'dc:title',
+        "keyword": 'dc:subject',
+        "type": 'dc:type'
+        }
+
+    constraints = []
+    if len(filter.keys()) > 0:
+        for f in filter:
+            key = filterMapping.get(f,f)
+            # todo: check if key is in getcapabilities
+            constraints.push(PropertyIsEqualTo(key, filter[f]))
+
+    while nextRecord > 0 and returned > 0 and nextRecord < maxrecords:
+        csw.getrecords2(maxrecords=pagesize,outputschema='http://www.isotc211.org/2005/gmd',startposition=nextRecord,esn='full')
+        print('CSW query ' + str(csw.results['returned']) + ' of ' + str(csw.results['matches']) + ' records from ' + str(nextRecord) + '.')
+        nextRecord = csw.results['nextrecord']
+        returned = csw.results['returned']
+        
+        for rec in csw.records:
+            try:
+                md = {'metaidentifier': csw.records[rec].identifier}
+                md['meta'] = parseISO(csw.records[rec].xml,url.split('?')[0]+'?service=CSW&version=2.0.1&request=GetRecordbyID&id='+csw.records[rec].identifier)
+                recs[csw.records[rec].identifier] = md
+                
+            except Exception as e:
+                print(f"Parse CSW results failed ; {str(e)}")
+    
+    return recs
 
 def parseExcel(file):
     from openpyxl import load_workbook
@@ -600,7 +632,8 @@ parse a dublin core record to MCF
 def parseDC(dct,fname):
 
     # make sure dcparams are available and not None
-    dcparams = 'contentStatus,lastPrinted,revision,version,creator,url,copyright,lastModifiedBy,modified,created,title,subject,description,identifier,language,keywords,category,year'.split(',')
+    dcparams = ("contentStatus,lastPrinted,revision,version,creator,url,copyright,lastModifiedBy,modified,created," + 
+                "title,subject,description,identifier,language,keywords,category,year").split(',')
     for p in dcparams:
         if p not in dct.keys() or dct[p] == None:
             dct[p] = ""
@@ -668,6 +701,7 @@ def parseDC(dct,fname):
     return exp
 
 def parseISO(strXML, u):
+    doc = None
     # check if a csw request
     if 'GetRecordByIdResponse' in str(strXML):
         try:
