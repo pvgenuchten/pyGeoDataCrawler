@@ -1,4 +1,4 @@
-{% if contact and record %}
+{% if contact not in [None,''] and record not in [None,''] %}
 <gmd:CI_ResponsibleParty>
   {{ cs.get_freetext('individualName', record.get('metadata',{}).get('language_alternate','en'), get_charstring(contact.get('individualname',''), record.get('metadata',{}).get('language',''), record.get('metadata',{}).get('language_alternate',''))) }}
   {{ cs.get_freetext('organisationName', record.get('metadata',{}).get('language_alternate','en'), get_charstring(contact.get('organization',''), record.get('metadata',{}).get('language',''), record.get('metadata',{}).get('language_alternate',''))) }}

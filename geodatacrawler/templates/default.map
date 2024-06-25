@@ -1,5 +1,4 @@
 MAP
-    CONFIG "PROJ_LIB" "/usr/share/proj/"
     DEBUG 1
     NAME "default"
     SIZE 800 800
@@ -13,7 +12,7 @@ MAP
     IMAGETYPE AGGA
 
     OUTPUTFORMAT
-        NAME "GEOTIFF_BYTE"
+        NAME "TIFF_BYTE"
         DRIVER "GDAL/GTiff"
         MIMETYPE "image/tiff"
         FORMATOPTION "COMPRESS=DEFLATE"
@@ -23,7 +22,17 @@ MAP
         IMAGEMODE BYTE
         EXTENSION "tif"
     END
-    
+    OUTPUTFORMAT
+        NAME "GEOTIFF_BYTE"
+        DRIVER "GDAL/GTiff"
+        MIMETYPE "image/geotiff"
+        FORMATOPTION "COMPRESS=DEFLATE"
+        FORMATOPTION "ZLEVEL=2"
+        FORMATOPTION "TILED=YES"
+        FORMATOPTION "PREDICTOR=2"
+        IMAGEMODE BYTE
+        EXTENSION "tif"
+    END
     OUTPUTFORMAT
         NAME "SVG"
         DRIVER CAIRO/SVG
@@ -31,7 +40,6 @@ MAP
         IMAGEMODE RGB
         EXTENSION "svg"
     END
-
     OUTPUTFORMAT
         NAME "AGGA"
         DRIVER AGG/PNG
@@ -45,34 +53,35 @@ MAP
         IMAGEPATH '/tmp/'
         TEMPPATH '/tmp/'
         METADATA
-            'ows_title'           ''
-            'ows_srs'             'EPSG:4326 EPSG:3857 EPSG:54009 EPSG:54012'
-            'ows_abstract'        ''
-            'ows_keywordlist'     ''
-            'ows_enable_request'   '*'
+            'ows_title'                 ''
+            'ows_srs'                   'EPSG:4326 EPSG:3857 EPSG:54009 EPSG:54012'
+            'ows_abstract'              ''
+            'ows_keywordlist'           ''
+            'ows_enable_request'        '*'
             'ows_getlegendgraphic_formatlist' 'image/png,image/svg+xml'
-            'ows_description'        ''
-            'ows_addresstype'          'postal'
-            'ows_address'              ''
-            'ows_city'                 ''
-            'ows_stateorprovince'      ''
-            'ows_postcode'             ''
-            'ows_country'              ''
+            'ows_description'           ''
+            'ows_addresstype'           'postal'
+            'ows_address'               ''
+            'ows_city'                  ''
+            'ows_stateorprovince'       ''
+            'ows_postcode'              ''
+            'ows_country'               ''
             'ows_contactelectronicmailaddress' ''
-            'ows_contactperson'            ''
-            'ows_contactorganization'      ''
-            'ows_contactposition'         ''
-            'ows_hoursofservice'    ''
-            'ows_contactinstructions' ''
-            'ows_role'              ''
-            'ows_fees'              'None'
-            'ows_accessconstraints' 'None'
-            'ows_onlineresource'    'http://localhost/example'
-            'oga_onlineresource'    'http://localhost/example/ogcapi'
+            'ows_contactperson'         ''
+            'ows_contactorganization'   ''
+            'ows_contactposition'       ''
+            'ows_hoursofservice'        ''
+            'ows_contactinstructions'   ''
+            'ows_role'                  ''
+            'ows_fees'                  'None'
+            'ows_accessconstraints'     'None'
+            'ows_onlineresource'        'http://localhost/example'
+            'oga_onlineresource'        'http://localhost/example/ogcapi'
             'oga_enable_request'        '*'  
             'wms_allow_getmap_without_styles' 'true'
-            'wms_rootlayer_name' ''
-            'wms_feature_info_mime_type' 'text/html' 
+            'wms_rootlayer_name'        ''
+            'wms_feature_info_mime_type' 'text/html'
+            'wcs_label'                 'WCS' 
         END
     END # WEB
 

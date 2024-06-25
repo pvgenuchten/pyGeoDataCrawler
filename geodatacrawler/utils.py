@@ -1,6 +1,9 @@
 from logging import NullHandler
+from unidecode import unidecode
+from bs4 import BeautifulSoup  
 import os
 import time
+import datetime
 import sys
 import pprint
 import urllib.request
@@ -14,6 +17,9 @@ import json
 import requests as req
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from geodatacrawler import GDCCONFIG
+import importlib.metadata
+
+
 
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
@@ -51,25 +57,36 @@ def indexFile(fname, extension):
             srcband = d.GetRasterBand(i+1) # raster bands counts from 1
             if not srcband.GetMinimum():
                 srcband.ComputeStatistics(0)
+            try:
+                noData = int(srcband.GetNoDataValue())
+            except: 
+                noData = None
             bands.append({
                     "name": srcband.GetDescription(),
                     "min": srcband.GetMinimum(),
                     "max": srcband.GetMaximum(),
-                    "nodata": int(srcband.GetNoDataValue() or 0),
+                    "nodata": noData,
                     "units": str(srcband.GetUnitType() or '')
             })
 
         content['bounds'] = [ulx, lry, lrx, uly]
-        content['bounds_wgs84'] = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
+        if crs2code(d.GetProjection()) == 'EPSG:4326':
+            content['bounds_wgs84'] = content['bounds']
+        else:
+            content['bounds_wgs84'] = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
+                
         #which crs
         content['crs-str'] = str(d.GetProjection())
         crs = crs2code(d.GetProjection())
         content['crs'] = crs
 
+        meta = d.GetMetadata()
+        dict_merge(content,meta)
+
         content['content_info'] = {
                 'type': 'image',
                 'dimensions': bands,
-                'meta':  d.GetMetadata()
+                'meta':  meta
             }
         d = None
 
@@ -99,7 +116,10 @@ def indexFile(fname, extension):
         content['geomtype'] = tp
         # change axis order
         content['bounds'] = [b[0],b[2],b[1],b[3]]
-        content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
+        if crs2code(srs) == 'EPSG:4326':
+            content['bounds_wgs84'] = content['bounds']
+        else:
+            content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
         
         content['crs-str'] = str(srs)
         content['crs'] = crs2code(srs)
@@ -201,7 +221,7 @@ def reprojectBounds(bnds,source,trg):
 '''
 fetch ows capabilities and check if layer exists, returns distribution object with matched layers from wms
 '''
-def checkOWSLayer(url, protocol, name, identifier, title):
+def checkOWSLayer(url, protocol, name, identifier, title, cnf):
     if url in [None,''] or protocol in [None,'']:
         print('no input:',url,protocol)
         return {}
@@ -260,7 +280,7 @@ def checkOWSLayer(url, protocol, name, identifier, title):
                 if isinstance(name, str):
                     name = name.split(',')
                 for l in name: # name may contain multiple layers (or all)
-                    if name == 'ALL':
+                    if l == 'ALL':
                         matchedLayers = idf.get('distribution',{})
                     else:
                         for k,wl in idf.get('distribution',{}).items():
@@ -294,29 +314,16 @@ def checkOWSLayer(url, protocol, name, identifier, title):
             # not found matched layer?
                 # suggestion for a layer?? 
     elif 'CSW' in protocol.upper():  
-        from owslib.csw import CatalogueServiceWeb
-        from owslib.fes import PropertyIsEqualTo, PropertyIsLike, BBox
-        csw = CatalogueServiceWeb(url)
 
-        # qry = PropertyIsEqualTo('csw:AnyText', 'soil')
-        nextRecord = 1
-        returned = 1
-        recs = {}
-        while nextRecord > 0 and returned > 0:
-            csw.getrecords2(maxrecords=250,outputschema='http://www.isotc211.org/2005/gmd',startposition=nextRecord)
-            print('CSW query ' + str(csw.results['returned']) + ' of ' + str(csw.results['matches']) + ' records from ' + str(nextRecord) + '.')
-            nextRecord = csw.results['nextrecord']
-            returned = csw.results['returned']
-            
-            for rec in csw.records:
-                try:
-                    md = {'metaidentifier': csw.records[rec].identifier}
-                    md['meta'] = parseISO(csw.records[rec].xml,url.split('?')[0]+'?service=CSW&version=2.0.1&request=GetRecordbyID&id='+csw.records[rec].identifier)
-                    recs[csw.records[rec].identifier] = md
-                    
-                except Exception as e:
-                    print(f"Parse CSW results failed ; {str(e)}")
-        capmd['distribution'] = recs
+        constraints = cnf.get('harvest',{}).get('filter',{})
+        pagesize = cnf.get('harvest',{}).get('pagesize', 50)
+        maxrecords = cnf.get('harvest',{}).get('maxrecords', 250)
+        
+        records = harvestCSW(url, constraints, pagesize, maxrecords)
+        if records and len(records) > 0:
+            capmd['distribution'] = recs
+        else:
+            print(f'No records harvested from {url}, using filter {filter}')
         return capmd
 
     elif 'WFS' in protocol.upper():  
@@ -326,6 +333,48 @@ def checkOWSLayer(url, protocol, name, identifier, title):
         print(protocol,'not implemented',url,identifier)
     
     return None
+
+def harvestCSW(url, filter, pagesize, maxrecords):
+    
+    from owslib.csw import CatalogueServiceWeb
+    from owslib.fes import PropertyIsEqualTo, PropertyIsLike, BBox
+    csw = CatalogueServiceWeb(url)
+
+    # qry = PropertyIsEqualTo('csw:AnyText', 'soil')
+    nextRecord = 1
+    returned = 1
+    recs = {}
+
+    filterMapping = {
+        "any": 'csw:AnyText',
+        "title": 'dc:title',
+        "keyword": 'dc:subject',
+        "type": 'dc:type'
+        }
+
+    constraints = []
+    if len(filter.keys()) > 0:
+        for f in filter:
+            key = filterMapping.get(f,f)
+            # todo: check if key is in getcapabilities
+            constraints.push(PropertyIsEqualTo(key, filter[f]))
+
+    while nextRecord > 0 and returned > 0 and nextRecord < maxrecords:
+        csw.getrecords2(maxrecords=pagesize,outputschema='http://www.isotc211.org/2005/gmd',startposition=nextRecord,esn='full')
+        print('CSW query ' + str(csw.results['returned']) + ' of ' + str(csw.results['matches']) + ' records from ' + str(nextRecord) + '.')
+        nextRecord = csw.results['nextrecord']
+        returned = csw.results['returned']
+        
+        for rec in csw.records:
+            try:
+                md = {'metaidentifier': csw.records[rec].identifier}
+                md['meta'] = parseISO(csw.records[rec].xml,url.split('?')[0]+'?service=CSW&version=2.0.1&request=GetRecordbyID&id='+csw.records[rec].identifier)
+                recs[csw.records[rec].identifier] = md
+                
+            except Exception as e:
+                print(f"Parse CSW results failed ; {str(e)}")
+    
+    return recs
 
 def parseExcel(file):
     from openpyxl import load_workbook
@@ -340,7 +389,6 @@ def parseExcelTraditional(file):
     import xlrd
     try:
         book = xlrd.open_workbook(file)
-        print(book.__dict__)
         return book.__dict__
     except Exception as e:
         print(f"Failed to read {file} as Spreadsheet; {str(e)}")
@@ -364,7 +412,7 @@ def prepCapabsResponse(CoreMD,lyrs):
                     mu = v['metadataUrls'][0]
                 md = fetchMetadata(mu['url'])
                         
-            if md:
+            if md not in [None,'']:
                 v['metaidentifier'] = md.get('metadata',{}).get('identifier','')
                 # todo: owslib does not capture the v.identifier element
                 v['meta'] = md
@@ -420,26 +468,56 @@ def fetchMetadata(u):
     if not (u.strip().startswith('http') or u.strip().startswith('//')):
         return None
 
-    if 'doi.org' in u:
+    if 'doi.org/' in u:
+        doi = u.split('doi.org/').pop()
         try:
-            resp = fetchUrl("https://api.datacite.org/dois/"+u.split('doi.org/')[1])
+            # some orgs are not in datacite
+            if doi.split("/")[0] in GDCCONFIG["doi-prefix-not-in-datacite"]:
+                raise ValueError(f"Prefix {doi.split('/')[0]} assumed not present in datacite")
+
+            resp = fetchUrl("https://api.datacite.org/dois?query="+doi)
             if resp.status_code == 200:
-                md = parseDataCite(resp.text,u)  
-                return md
+                md = json.loads(resp.text)
+                if md['data'] and len(md['data']) > 0:
+                    return parseDataCite(md['data'][0],doi)  
+                else:
+                    raise ValueError(f'doi {doi} not found in datacite')    
             else:
-                print('doi 404', u) # todo: retrieve instead the citation
+                raise ValueError(f"Error fetch doi {doi} from datacite, Code: {resp.status_code}")
         except Exception as e:
-                print("Failed to fetch ",u.split('doi.org/')[1],str(e))
+            print(f"Error fetch doi {doi}, {str(e)}. Trying Crossref")
+            try:
+                resp = fetchUrl("https://api.crossref.org/works/"+doi)
+                if resp.status_code == 200:
+                    md = json.loads(resp.text)
+                    return parseCrossref(md, doi)
+            except Exception as e:
+                print(f"Error fetch doi {doi}, {str(e)}. Trying bibtex")
+                try:
+                #if 0==0: 
+                    import bibtexparser
+                    resp = fetchUrl(u,{"Accept": "application/x-bibtex; charset=utf-8", 'User-agent': 'Mozilla/5.0'})
+                    article = bibtexparser.parse_string(resp.text)
+                    for first_entry in article.entries:
+                        md = {"identifier": safeFileName(first_entry.key) }
+                        md['type'] = first_entry.entry_type
+                        for f in first_entry.fields:
+                            md[f.key] = f.value                     
+                        return parseDC(md,md.get('title',safeFileName(u.split('doi.org/').pop())))
+                    return None
+                except Exception as e:
+                    print("Failed to parse bibtex ",u,str(e))
+
     else:
         # Try a generic request
         try:
-            resp = fetchUrl(u)
+            resp = fetchUrl(u,{"accept":"application/xml"})
             restype = resp.headers['Content-Type']
             md = {}
             if (restype == 'application/json'):
-                md = parseDataCite(resp.text,u)
+                md = parseDataCite(json.loads(resp.text),u)
                 # datapackage, stac, ogcapi-records, etc....   
-            elif (restype == 'application/xml' or restype == 'text/xml'):
+            elif ('application/xml' in restype or 'text/xml' in restype):
                 # datacite can also be in xml
                 md = parseISO(resp.text,u)
             else:
@@ -449,8 +527,56 @@ def fetchMetadata(u):
         except Exception as e:
                 print("Failed to fetch",u,str(e))    
 
-def parseDataCite(strJSON, u):
-    attrs = json.loads(strJSON)
+def parseCrossref(md, u):
+    if 'message' in md:
+        if not 'published' in md['message']:
+            md['message']['published'] = md['message'].get('published-online')
+        md2 = {
+            'metadata': { 
+                'identifier': u,
+                'language': 'eng',
+                'hierarchylevel': md['message'].get('type','journal-article'),
+                'dataseturi': 'http://doi.org/'+u,
+                'datestamp': md['message'].get('indexed',{}).get('date-time','')
+            },
+            'identification': {
+                'title': md['message'].get('title',[''])[0],
+                'abstract': md['message'].get('abstract','').replace('jats:',''),
+                'dates': { 
+                    'creation':  md['message'].get('created',{}).get('date-time',''),
+                    'publication': str(md['message'].get('published',{}).get('date-parts',[])).replace('[','').replace(', ','-').replace(']','')
+                    },
+                'language': md['message'].get('language',''),
+                'license': { 'name': '', 'url': md['message'].get('license',[{}])[0].get('URL','') },
+                'keywords': {'default': {'keywords': md['message'].get('short-container-title', [])  }}
+            },
+            'contact': {
+                'publisher': {
+                    'role': 'publisher',
+                    'organization': md['message'].get('publisher','')
+                },
+            },
+            'distribution': {
+                'primary': {
+                    'name': md['message'].get('title',[''])[0],
+                    'type': 'application/pdf',
+                    'url': md['message'].get('resource',{}).get('primary',{}).get('URL','http://doi.org/'+u)
+                }
+            }
+        }
+        i=0
+        for a in md['message'].get('author',[]):
+            i+=1
+            md2['contact']['author'+str(i)] = {
+                'role': 'author',
+                'individualname': a.get('given','')+' '+a.get('family',''),
+                'organization': next(iter(a.get('affiliation',[])), {}).get('Name',''),
+                'url':  md['message'].get('ORCID','')
+            }
+        return md2
+    return None
+
+def parseDataCite(attrs, u):
     # some datacite embeds content in data.attributes
     if ('data' in attrs and 'attributes' in attrs['data']):
         attrs = attrs.get('data',{}).get('attributes',{})
@@ -461,6 +587,7 @@ def parseDataCite(strJSON, u):
         'identification': {
             'title': arrit(attrs,'titles',{}).get('title',''),
             'abstract': arrit(attrs,'descriptions',{}).get('description',''),
+            'license': {'name': arrit(attrs,'licenses',{}).get('title','')},
             'dates': {}
         },
         'contact': DOIContactstoMCF(attrs.get('creators',[]) + attrs.get('contributors',[])),
@@ -498,13 +625,89 @@ def getDate(fname):
         print("WARNING: Error getting date",fname,str(e)) 
     return d
 
+
+'''
+parse a dublin core record to MCF
+'''
+def parseDC(dct,fname):
+
+    # make sure dcparams are available and not None
+    dcparams = ("contentStatus,lastPrinted,revision,version,creator,url,copyright,lastModifiedBy,modified,created," + 
+                "title,subject,description,identifier,language,keywords,category,year").split(',')
+    for p in dcparams:
+        if p not in dct.keys() or dct[p] == None:
+            dct[p] = ""
+
+    exp = {"mcf":{"version":1.0}}
+    for k in ['metadata','spatial','identification','distribution','contact']:
+        exp[k] = {}
+    
+    if 'name' not in dct.keys() or dct['name'] in [None,'']:
+        dct['name'] = dct.get('title',fname)
+    if dct['name'] == '':
+        dct['name'] = fname
+    exp['identification']['title'] = dct['name']
+    exp['metadata']['identifier'] = dct.get('identifier',safeFileName(exp['identification']['title']))
+    if isinstance(exp['metadata']['identifier'], list):
+        exp['metadata']['identifier'] = exp['metadata']['identifier'][0]
+    if exp['metadata']['identifier'].startswith('http'):
+        exp['metadata']['dataseturi'] = exp['metadata']['identifier'];
+        
+    exp['identification']['abstract'] = dct.get('description','')
+
+    exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', datetime.date.today())) 
+    ct3=[]
+    for ct in "author,publisher,creator".split(','):    
+        ct2 = dct.get(ct,'')
+        if isinstance(ct2, list):
+            ct3 += ct2
+        else:
+            ct3 += ct2.replace(' and ',';').split(';')
+        for c in ct3:
+            if c.strip() == '':
+                None
+            elif '@' in c:
+                exp['contact'][safeFileName(c)] = {'email': c, 'role':ct}
+            else:
+                exp['contact'][safeFileName(c)] = {'individualname': c, 'role':ct}
+
+    ct4 = []
+    for ct in "keywords,subject,category".split(','):    
+            ct2 = dct.get(ct,'')
+            if isinstance(ct2, list):
+                ct4 += [k.strip() for k in ct2 if k != '']
+            else:
+                ct4 += [k.strip() for k in ct2.replace(',',';').split(';') if k != '']
+    exp['identification']['keywords'] = {'default': {'keywords': ct4}}
+
+    exp['spatial']['datatype'] = dct.get('datatype','')
+    exp['spatial']['geomtype'] = dct.get('geomtype','')
+    exp['identification']['status'] = dct.get('contentStatus','' )
+    exp['identification']['language'] = dct.get('language','')
+    exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
+    exp['identification']['rights'] = dct.get('copyright','')
+    if 'extents' not in exp['identification'].keys():
+        exp['identification']['extents'] = {}
+    if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
+        bnds = dct.get('bounds_wgs84')
+        crs = 4326
+    else:
+        bnds = dct.get('bounds',[])
+        crs = dct.get('crs','4326')
+    exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
+    exp['content_info'] = dct.get('content_info',{})  
+    if dct['url'] not in [None,'']:
+        exp['distribution']['www'] = {'name': fname, 'url': dct['url'], 'type': 'www'}
+    return exp
+
 def parseISO(strXML, u):
+    doc = None
     # check if a csw request
     if 'GetRecordByIdResponse' in str(strXML):
         try:
             doc = etree.fromstring(strXML)
         except ValueError:
-            print('initial parse failed')
+            print(f'iso19139 parse failed {u}')
             doc = etree.fromstring(bytes(strXML, 'utf-8'))
         nsmap = {}
         for ns in doc.xpath('//namespace::*'):
@@ -514,12 +717,12 @@ def parseISO(strXML, u):
         md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
         strXML = etree.tostring(md[0])
 
-    try:
-        iso_os = ISO19139OutputSchema()
-        md = iso_os.import_(strXML)
-        return md
-    except Exception as e:
-        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+    #try:
+    iso_os = ISO19139OutputSchema()
+    md = iso_os.import_(strXML)
+    return md
+    #except Exception as e:
+    #    print('no iso19139 at',u,e) # could parse url to find param id (csw request)
 
 
 def owsCapabilities2md (url, protocol):
@@ -576,21 +779,26 @@ def owsCapabilities2md (url, protocol):
     
     return lyrmd
 
-def fetchUrl(url):
+def fetchUrl(url,hdr=None):
+    if hdr in [None,'']:
+        version = importlib.metadata.version('geodatacrawler') or ''
+        contact = os.getenv('pgdc_contact') or ''
+        hdr={'User-agent': f'pyGeoDataCrawler {version};  (mailto:{contact})'}
     try:
-        r = req.get(url, headers={'User-agent': 'Mozilla/5.0'}, timeout=5)
+        r = req.get(url, headers=hdr, timeout=5)
         r.raise_for_status()
         return r
     except req.exceptions.SSLError as sslerr:
         print('retry without cert validation',sslerr)
-        return req.get(url, headers={'User-agent': 'Mozilla/5.0'}, verify=False, timeout=5)
+        return req.get(url, headers=hdr, verify=False, timeout=5)
 
 def safeFileName(n):
+    n = str(n)
     if n not in [None,'']:
         ''' remove unsafe characters from a var to make it safe'''
         for i in ['(',')','[',']','{','}','&','~','%','+',',']:
             n = n.replace(i,'')
         for i in ['#',' ','!','+','/','\\',':',';']:
             n = n.replace(i,'-')
-        return n
+        return unidecode(n)
     return ""

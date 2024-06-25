@@ -1,4 +1,4 @@
-__version__ = '1.2.6'
+__version__ = '1.3.1'
 
 GDCCONFIG = {
 "TEXT_FILE_TYPES":  ['xlsm', 'xlsx', 'xltx', 'xltm', 'db', 'csv'],
@@ -12,8 +12,8 @@ for d in GDCCONFIG['VECTOR_FILE_TYPES']: # only index types supported by ogr dri
        GDCCONFIG['VECTOR_FILE_TYPES'].remove(d)
 GDCCONFIG["SPATIAL_FILE_TYPES"] = GDCCONFIG["GRID_FILE_TYPES"] + GDCCONFIG["VECTOR_FILE_TYPES"]
 GDCCONFIG["INDEX_FILE_TYPES"] = GDCCONFIG["SPATIAL_FILE_TYPES"] + GDCCONFIG["TEXT_FILE_TYPES"]
-
-
+GDCCONFIG["doi-prefix-not-in-datacite"] = ["10.1002","10.1007","10.1016","10.1038","10.1039","10.1051","10.1021","10.1029"]
+GDCCONFIG["exclude-html-metas"] = ["viewport","applicable-device","X-UA-Compatible","360-site-verification","robots","access"]
 
 
 

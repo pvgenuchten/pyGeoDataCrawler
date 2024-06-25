@@ -5,4 +5,4 @@ import os, shutil
 md = load_default_metadata('init')
 processPath("./demo", md, "init", "", "./tests/tmp", "flat", "./demo", True, "", "")
 assert os.path.exists('./tests/tmp/00002.yml')
-shutil.rmtree('./tests/tmp')
+#shutil.rmtree('./tests/tmp')
