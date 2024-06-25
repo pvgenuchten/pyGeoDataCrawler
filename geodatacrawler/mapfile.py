@@ -183,7 +183,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 # check if a SLD exists
                                 sld = None
                                 if (os.path.exists(str(file).replace('yml','sld'))):
-                                    sld = os.path.exists(str(file).replace('yml','sld'))
+                                    sld = str(file).replace('yml','sld')
 
                                 # bounds_wgs84 also exists, but often empty
                                 # else cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('bbox')
@@ -212,7 +212,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 new_class_string2 = ""
 
                                 if sld: # reference sld file in current folder
-                                    new_class_string2 += f"STYLEITEM: \"sld://{sld}\"\n"
+                                    new_class_string2 += f"STYLEITEM: \"sld://{os.path.join('' if dir_out_mode == 'nested' else relPath,sld)}\"\n"
                                 elif 'styles' in ly.keys() and isinstance(ly['styles'],list):
                                     for style_reference in ly.get("styles", []): 
                                         # if isinstance(style_reference,dict): 
@@ -464,13 +464,13 @@ Extent a targetbox (tb) with a source box (sb)
 '''
 def updateBounds(sb,tb):
     if sb and len(sb) > 3:
-        if not tb[0] or float(sb[0]) < tb[0]:
+        if not (sb[0] in [None,''] and math.isinf(float(sb[0]))) and (not tb[0] or float(sb[0]) < tb[0]):
             tb[0] = float(sb[0])
-        if not tb[1] or float(sb[1]) < tb[1]:
+        if not (sb[1] in [None,''] and math.isinf(float(sb[1]))) and (not tb[1] or float(sb[1]) < tb[1]):
             tb[1] = float(sb[1])
-        if not tb[2] or float(sb[2]) > tb[2]:
+        if not (sb[2] in [None,''] and math.isinf(float(sb[2]))) and (not tb[2] or float(sb[2]) > tb[2]):
             tb[2] = float(sb[2])
-        if not tb[3] or float(sb[3]) > tb[3]:
+        if not (sb[3] in [None,''] and math.isinf(float(sb[3]))) and (not tb[3] or float(sb[3]) > tb[3]):
             tb[3] = float(sb[3])
 
 '''

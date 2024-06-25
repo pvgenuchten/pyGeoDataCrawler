@@ -22,7 +22,7 @@ LAYER
         'gml_featureid'             '{id}'
         'wcs_label'                 'WCS'
         'wcs_rangeset_name'         '{name}'
-        'wcs_rangeset_label'        '{title}'
+        'wcs_rangeset_label'        {title}
     END
     {classes}
 END

@@ -188,11 +188,11 @@ jinja2 = "*"
 
 [[package]]
 name = "jsonref"
-version = "0.2"
-description = "An implementation of JSON Reference for Python"
+version = "1.1.0"
+description = "jsonref is a library for automatic dereferencing of JSON Reference objects for Python."
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 
 [[package]]
 name = "jsonschema"
@@ -227,15 +227,16 @@ importlib-resources = {version = ">=1.4.0", markers = "python_version < \"3.9\""
 referencing = ">=0.31.0"
 
 [[package]]
-name = "lark-parser"
-version = "0.12.0"
+name = "lark"
+version = "1.1.9"
 description = "a modern parsing library"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.6"
 
 [package.extras]
 atomic_cache = ["atomicwrites"]
+interegular = ["interegular (>=0.3.1,<0.4.0)"]
 nearley = ["js2py"]
 regex = ["regex"]
 
@@ -256,17 +257,20 @@ source = ["Cython (>=3.0.10)"]
 
 [[package]]
 name = "mappyfile"
-version = "0.9.7"
+version = "1.0.2"
 description = "A pure Python MapFile parser for working with MapServer"
 category = "main"
 optional = false
 python-versions = "*"
 
 [package.dependencies]
-click = {version = "*", markers = "python_version >= \"3.0.0\""}
-jsonref = "0.2"
-jsonschema = {version = ">=2.0", markers = "python_version >= \"3.0.0\""}
-lark-parser = ">=0.11.3"
+click = "*"
+jsonref = "1.1.0"
+jsonschema = ">=4.18.0"
+lark = ">=1.1.5"
+
+[package.extras]
+lark-cython = ["lark-cython (>=0.0.14)"]
 
 [[package]]
 name = "markupsafe"
@@ -289,7 +293,7 @@ et-xmlfile = "*"
 
 [[package]]
 name = "owslib"
-version = "0.30.0"
+version = "0.31.0"
 description = "OGC Web Service utility library"
 category = "main"
 optional = false
@@ -526,7 +530,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-ena
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "abccadbe9be98e3f5ce10de2631f8a9f021a31da0dec87233d9baf2a57351934"
+content-hash = "3eac4e4ecbccee37ef7124ebbef485e2323818f5d2a27849a6daa9c6984c92e5"
 
 [metadata.files]
 arrow = []
@@ -548,7 +552,7 @@ jinja2-time = []
 jsonref = []
 jsonschema = []
 jsonschema-specifications = []
-lark-parser = []
+lark = []
 lxml = []
 mappyfile = []
 markupsafe = []
