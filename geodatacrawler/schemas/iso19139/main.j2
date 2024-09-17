@@ -74,8 +74,8 @@
     </gmd:MD_VectorSpatialRepresentation>
     {% endif %}
   </gmd:spatialRepresentationInfo>
-  {% if record['identification']['extents'].get('spatial') not in [None,''] %}
-  {% for rs in record['identification']['extents'].get('spatial',[]) %}
+  {% if record['identification'].get('extents',{}).get('spatial') not in [None,''] %}
+  {% for rs in record['identification'].get('extents',{}).get('spatial',[]) %}
   {% if rs %}
   <gmd:referenceSystemInfo>
     <gmd:MD_ReferenceSystem>
@@ -216,7 +216,7 @@
       {% endfor %}
       <gmd:extent>
         <gmd:EX_Extent>
-          {% for spatial in record['identification']['extents']['spatial'] %}
+          {% for spatial in record['identification'].get('extents',{}).get('spatial',[]) %}
           {% set bbox = spatial['bbox'] %}
           <gmd:geographicElement>
             {% if spatial['crs'] != 4326 %}
@@ -255,7 +255,7 @@
             {% endif %}
           </gmd:geographicElement>
           {% endfor %}
-          {% for temporal in record['identification']['extents']['temporal'] %}
+          {% for temporal in record['identification'].get('extents',{}).get('temporal',[]) %}
           <gmd:temporalElement>
             <gmd:EX_TemporalExtent>
               <gmd:extent>

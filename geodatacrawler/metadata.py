@@ -129,8 +129,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 relPath = ""
                 if mydir != "":
                     relPath = os.path.relpath(os.path.dirname(file), root)
-                # why is this, maybe sould be len(rp)==1?
-                if relPath == '1':
+                if relPath == os.sep or relPath == '.'+os.sep: # /
                     relPath == ''
                 if (dir_out_mode=='flat'):
                     outBase = os.path.join(dir_out,fn)
@@ -138,7 +137,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     outBase = os.path.join(dir_out,relPath,fn)
                 yf = os.path.join(outBase+'.yml')
                 #relPath=base.replace(root,'')
-                if extension.lower() in ["xml"] and fn != "index":
+                if extension.lower() in ["xml"] and ".aux.xml" not in str(file).lower() and fn != "index":
                     if mode == "init":
                         md=None
                         with open(str(file), mode="r", encoding="utf-8") as f:
@@ -225,7 +224,10 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     if dir_out_mode == "flat":
                                         pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.'+fext)
                                     else:
-                                        pth = os.path.join(target_path,safeFileName(md['metadata']['identifier'])+'.'+fext)
+                                        if not os.path.exists(os.path.join(dir_out,target_path)):
+                                            print('create folder',os.path.join(dir_out,target_path))
+                                            os.makedirs(os.path.join(dir_out,target_path))
+                                        pth = os.path.join(dir_out,target_path,safeFileName(md['metadata']['identifier'])+'.'+fext)
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
                                         print(profile + ' generated at ' + pth)    
@@ -432,11 +434,8 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     # print ('Indexing file ' + fname)
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
-                        cnt = indexFile(fname, extension) 
-                        print('foo',cnt)
-                        md = parseDC(cnt,fname)
-                        print('foo2',md)
-                        checkId(md,str(os.path.join(relPath,fn)).replace(os.sep,'-'),prefix)
+                        md = indexFile(fname, extension) 
+                        checkId(md,'-'.join(i for i in str(os.path.join(relPath,fn)).split(os.sep) if i not in ['','.','..',' ']),prefix)
                         if 'identification' not in md or md['identification'] is None:
                             md['identification'] = {}
                         if 'title' not in md['identification'] or md['identification']['title'] in [None,'']:

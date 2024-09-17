@@ -81,7 +81,8 @@ def indexFile(fname, extension):
         content['crs'] = crs
 
         meta = d.GetMetadata()
-        dict_merge(content,meta)
+        m2 = parseDC(meta,'') # see if meta has dc properties
+        dict_merge(content,m2)
 
         content['content_info'] = {
                 'type': 'image',
@@ -462,11 +463,22 @@ def parse_report_file(file):
             return 'Is JSON'
         return 'Is INVALID'
 
+def valideMD(md):
+    if ('identification' in md and 'title' in md['identification'] and md['identification']['title'] not in [None,'']
+        and 'metadata' in md and 'identifier' in md['metadata'] and md['metadata']['identifier'] not in [None,'']):
+        return True
+    else:
+        return False
+
 def fetchMetadata(u):
+
+    fullMD = False;
     ''' fetch metadata of a url, first determine type then parse it '''
     # analyse url
     if not (u.strip().startswith('http') or u.strip().startswith('//')):
         return None
+
+    md = {}
 
     if 'doi.org/' in u:
         doi = u.split('doi.org/').pop()
@@ -486,6 +498,9 @@ def fetchMetadata(u):
                 raise ValueError(f"Error fetch doi {doi} from datacite, Code: {resp.status_code}")
         except Exception as e:
             print(f"Error fetch doi {doi}, {str(e)}. Trying Crossref")
+
+        if not valideMD(md):
+            print('No valid md, try crossref')
             try:
                 resp = fetchUrl("https://api.crossref.org/works/"+doi)
                 if resp.status_code == 200:
@@ -493,20 +508,22 @@ def fetchMetadata(u):
                     return parseCrossref(md, doi)
             except Exception as e:
                 print(f"Error fetch doi {doi}, {str(e)}. Trying bibtex")
-                try:
-                #if 0==0: 
-                    import bibtexparser
-                    resp = fetchUrl(u,{"Accept": "application/x-bibtex; charset=utf-8", 'User-agent': 'Mozilla/5.0'})
-                    article = bibtexparser.parse_string(resp.text)
-                    for first_entry in article.entries:
-                        md = {"identifier": safeFileName(first_entry.key) }
-                        md['type'] = first_entry.entry_type
-                        for f in first_entry.fields:
-                            md[f.key] = f.value                     
-                        return parseDC(md,md.get('title',safeFileName(u.split('doi.org/').pop())))
-                    return None
-                except Exception as e:
-                    print("Failed to parse bibtex ",u,str(e))
+                
+        if not valideMD(md):       
+            try:
+            #if 0==0: 
+                import bibtexparser
+                resp = fetchUrl(u,{"Accept": "application/x-bibtex; charset=utf-8", 'User-agent': 'Mozilla/5.0'})
+                article = bibtexparser.parse_string(resp.text)
+                for first_entry in article.entries:
+                    md = {"identifier": safeFileName(first_entry.key) }
+                    md['type'] = first_entry.entry_type
+                    for f in first_entry.fields:
+                        md[f.key] = f.value                     
+                    return parseDC(md,md.get('title',safeFileName(u.split('doi.org/').pop())))
+                return None
+            except Exception as e:
+                print("Failed to parse bibtex ",u,str(e))
 
     else:
         # Try a generic request
@@ -578,8 +595,8 @@ def parseCrossref(md, u):
 
 def parseDataCite(attrs, u):
     # some datacite embeds content in data.attributes
-    if ('data' in attrs and 'attributes' in attrs['data']):
-        attrs = attrs.get('data',{}).get('attributes',{})
+    if ('attributes' in attrs):
+        attrs = attrs.get('attributes',{})
     md = {
         'metadata': { 
             'identifier': safeFileName(u.split('://')[-1].split('?')[0]),
@@ -653,7 +670,7 @@ def parseDC(dct,fname):
     if exp['metadata']['identifier'].startswith('http'):
         exp['metadata']['dataseturi'] = exp['metadata']['identifier'];
         
-    exp['identification']['abstract'] = dct.get('description','')
+    exp['identification']['abstract'] = ' '.join(i for i in [dct.get('description'),dct.get('abstract')] if i)
 
     exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', datetime.date.today())) 
     ct3=[]
