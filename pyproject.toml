@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "geodatacrawler"
-version = "1.3.1"
+version = "1.3.2"
 license = "MIT"
 description = "a crawler script to extract and author metadata of spatial datasets"
 authors = ["Paul van Genuchten <genuchten@yahoo.com>"]

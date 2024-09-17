@@ -65,6 +65,8 @@ robot:
 
 Some GDAL (raster) or OGR (vector) formats, such as [FileGDB](https://gdal.org/drivers/vector/openfilegdb.html), [GeoPackage](https://gdal.org/drivers/vector/gpkg.html) and [parquet](https://gdal.org/drivers/vector/parquet.html) require an additional plugin. Verify for each of the commom formats in your organisation, if the relevant GDAL plugins are installed.
 
+For grid files, the metadata will be extracted from the .aux.xml file. You can use the Dublin Core terms; title, description, license, ... in the grid metadata.
+
 ## Create mapfile
 
 The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A `index.yml` configuraton file is expected at the root of the folder to be indexed, if not, it will be created.
