@@ -17,16 +17,18 @@
   {% endif %}
   <gmd:hierarchyLevel>
     <gmd:MD_ScopeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_ScopeCode" codeSpace="ISOTC211/19115" codeListValue="{{ record.get('metadata',{})['hierarchylevel'] }}">{{ record.get('metadata',{})['hierarchylevel'] }}</gmd:MD_ScopeCode>
-  </gmd:hierarchyLevel>
+  </gmd:hierarchyLevel> 
+  
   {% for key, value in record['contact'].items() %}
-  {% if key in ['distributor', 'pointOfContact'] %}
-  <gmd:contact>
-    {% set contact = value %}
-    {% set role = contact['role'] or key %}
-    {% include "contact.j2" %}
-  </gmd:contact>
-  {% endif %}
+    {% if loop.index == 1 %}
+      <gmd:contact>  
+        {% set contact = value %}
+        {% set role = contact['role'] or key %}
+        {% include "contact.j2" %}   
+      </gmd:contact>
+    {% endif %}
   {% endfor %}
+  
   <gmd:dateStamp>
     {% set datestamp = record.get('metadata',{})['datestamp']|normalize_datestring %}
     {% if datestamp|length > 11 %}
@@ -82,7 +84,7 @@
       <gmd:referenceSystemIdentifier>
         <gmd:RS_Identifier>
           <gmd:code>
-            <gco:CharacterString>urn:ogc:def:crs:EPSG:{{ rs.get('crs','') | e }}</gco:CharacterString>
+            <gco:CharacterString>{% if (rs.get('crs',':')|string).find(':') > 0 %} EPSG:{% endif %}{{ rs.get('crs','') }}</gco:CharacterString>
           </gmd:code>
         </gmd:RS_Identifier>
       </gmd:referenceSystemIdentifier>
@@ -98,6 +100,7 @@
           {{ cs.get_freetext('title', record.get('metadata',{}).get('language_alternate',''), get_charstring(record['identification'].get('title'), record.get('metadata',{}).get('language','en'), record.get('metadata',{}).get('language_alternate'))) }}
           {% for date_type, date in record['identification']['dates'].items() %}
           {% set datestamp = date|normalize_datestring %}
+          {% if datestamp not in [None,'']  %}
           <gmd:date>
             <gmd:CI_Date>
               <gmd:date>
@@ -112,6 +115,7 @@
               </gmd:dateType>
             </gmd:CI_Date>
           </gmd:date>
+          {% endif %}
           {% endfor %}
           {% if record['identification']['edition'] %}
           {{ cs.get_freetext('edition', record.get('metadata',{}).get('language_alternate'), get_charstring(record['identification'].get('edition'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate'))) }}
@@ -148,6 +152,7 @@
       </gmd:graphicOverview>
       {% endif %}
       {% for key, value in record['identification']['keywords'].items() %}
+      {% if value.get('keywords',[]) | length > 0 %}
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
         {% set keywords = get_charstring(value.get('keywords'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate')) %}
@@ -187,6 +192,7 @@
         {% endif %}
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
+      {% endif %}
       {% endfor %}
       <gmd:resourceConstraints>
         <gmd:MD_LegalConstraints>
@@ -219,7 +225,7 @@
           {% for spatial in record['identification'].get('extents',{}).get('spatial',[]) %}
           {% set bbox = spatial['bbox'] %}
           <gmd:geographicElement>
-            {% if spatial['crs'] != 4326 %}
+            {% if (spatial.get('crs','4326')|string).find('4326') == -1 %}
             <gmd:EX_BoundingPolygon>
               <gmd:extentTypeCode>
                 <gco:Boolean>1</gco:Boolean>
@@ -252,27 +258,28 @@
                 <gco:Decimal>{{ bbox[3] }}</gco:Decimal>
               </gmd:northBoundLatitude>
             </gmd:EX_GeographicBoundingBox>
-            {% endif %}
+         
+          {% endif %}
           </gmd:geographicElement>
           {% endfor %}
           {% for temporal in record['identification'].get('extents',{}).get('temporal',[]) %}
-          <gmd:temporalElement>
-            <gmd:EX_TemporalExtent>
-              <gmd:extent>
-                <gml:TimePeriod gml:id="T001">
-                  <gml:beginPosition>{{ temporal['begin'] }}</gml:beginPosition>
-                  {% if temporal['end'] == 'now' %}
-                  <gml:endPosition indeterminatePosition="now"/>
-                  {% else %}
-                  <gml:endPosition>{{ temporal['end'] }}</gml:endPosition>
-                  {% endif %}
-                  {% if temporal['resolution'] %}
-                  <gml:duration>{{ temporal['resolution'] }}</gml:duration>
-                  {% endif %}
-                </gml:TimePeriod>
-              </gmd:extent>
-            </gmd:EX_TemporalExtent>
-          </gmd:temporalElement>
+            <gmd:temporalElement>
+              <gmd:EX_TemporalExtent>
+                <gmd:extent>
+                  <gml:TimePeriod gml:id="T001">
+                    <gml:beginPosition>{{ temporal['begin'] }}</gml:beginPosition>
+                    {% if temporal['end'] == 'now' %}
+                    <gml:endPosition indeterminatePosition="now"/>
+                    {% else %}
+                    <gml:endPosition>{{ temporal['end'] }}</gml:endPosition>
+                    {% endif %}
+                    {% if temporal['resolution'] %}
+                    <gml:duration>{{ temporal['resolution'] }}</gml:duration>
+                    {% endif %}
+                  </gml:TimePeriod>
+                </gmd:extent>
+              </gmd:EX_TemporalExtent>
+            </gmd:temporalElement>
           {% endfor %}
         </gmd:EX_Extent>
       </gmd:extent>
@@ -291,7 +298,7 @@
       </gmd:contentType>
       {% for dim in record['content_info']['dimensions'] %}
         <gmd:dimension>
-          <gmd:MD_Band id="{{ dim['name'] }}">
+          <gmd:MD_Band id="band-{{ loop.index }}">
             {% if dim['max'] %}
             <gmd:maxValue>
               <gco:Real>{{ dim['max'] }}</gco:Real>
@@ -310,9 +317,11 @@
           </gmd:MD_Band>
         </gmd:dimension>
       {% endfor %}
+      {% if record['content_info']['cloud_cover'] %}
       <gmd:cloudCoverPercentage>
         <gco:Real>{{ record['content_info']['cloud_cover'] }}</gco:Real>
       </gmd:cloudCoverPercentage>
+      {% endif %}
       <gmd:processingLevelCode>
         <gmd:RS_Identifier>
           <gmd:code>
@@ -327,14 +336,14 @@
   <gmd:distributionInfo>
     <gmd:MD_Distribution>
       {% for k, v in record['distribution'].items() %}
-      {% if v['format'] and v['format_version'] %}
-      <gmd:distributionFormat>
-        <gmd:MD_Format>
-          <gmd:name>{{ v['format']|e }}</gmd:name>
-          <gmd:version>{{ v['format_version']|e }}</gmd:version>
-        </gmd:MD_Format>
-      </gmd:distributionFormat>
-      {% endif %}
+        {% if v['format'] and v['format_version'] %}
+        <gmd:distributionFormat>
+          <gmd:MD_Format>
+            <gmd:name>{{ v['format']|e }}</gmd:name>
+            <gmd:version>{{ v['format_version']|e }}</gmd:version>
+          </gmd:MD_Format>
+        </gmd:distributionFormat>
+        {% endif %}
       {% endfor %}
       {% if 'distributor' in record['contact'].keys() %}
       <gmd:distributor>

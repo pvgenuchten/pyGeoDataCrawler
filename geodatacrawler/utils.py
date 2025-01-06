@@ -650,7 +650,7 @@ def parseDC(dct,fname):
 
     # make sure dcparams are available and not None
     dcparams = ("contentStatus,lastPrinted,revision,version,creator,url,copyright,lastModifiedBy,modified,created," + 
-                "title,subject,description,identifier,language,keywords,category,year").split(',')
+                "title,subject,description,identifier,language,keywords,category,year,abstract,format,licence,source,type,units").split(',')
     for p in dcparams:
         if p not in dct.keys() or dct[p] == None:
             dct[p] = ""
@@ -703,6 +703,10 @@ def parseDC(dct,fname):
     exp['identification']['language'] = dct.get('language','')
     exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
     exp['identification']['rights'] = dct.get('copyright','')
+    if dct.get('license','').startswith('http'):
+        exp['identification']['license'] = {'url': dct.get('license')}
+    elif dct.get('license') not in [None,'']:
+        exp['identification']['license'] = {'name': dct.get('license')}
     if 'extents' not in exp['identification'].keys():
         exp['identification']['extents'] = {}
     if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
@@ -713,6 +717,8 @@ def parseDC(dct,fname):
         crs = dct.get('crs','4326')
     exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
     exp['content_info'] = dct.get('content_info',{})  
+    exp['content_info']['type'] = dct.get('type','')
+    
     if dct['url'] not in [None,'']:
         exp['distribution']['www'] = {'name': fname, 'url': dct['url'], 'type': 'www'}
     return exp
