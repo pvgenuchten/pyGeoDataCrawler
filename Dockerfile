@@ -1,7 +1,7 @@
-FROM harbor.containers.wurnet.nl/isric/pycsw:2.9.11 
+#FROM harbor.containers.wurnet.nl/isric/pycsw
 #locally, build pcsw image first as docker build -t isric/pycsw .
 #FROM isric/pycsw:latest
-#FROM geopython/pycsw
+FROM geopython/pycsw
 
 USER root
 
@@ -9,7 +9,7 @@ USER root
 ARG TIMEZONE="Europe/Amsterdam"
 ARG LOCALE="en_US.UTF-8"
 #nano, sync for operations 
-ARG ADD_DEB_PACKAGES="nano nmap rsync sqlite3"
+ARG ADD_DEB_PACKAGES="nano nmap rsync sqlite3 software-properties-common"
 #for sld creation
 ARG ADD_PIP_PACKAGES=""
 
@@ -31,15 +31,9 @@ RUN \
 	&& update-locale LANG=${LOCALE} \
 	&& echo "For ${TZ} date=$(date)" && echo "Locale=$(locale)" 
 
-COPY . /pyGeoDataCrawler
-WORKDIR /pyGeoDataCrawler 
-RUN apt --no-install-recommends install -y software-properties-common
-RUN pip install poetry
-RUN gdal-config --version
-RUN poetry run pip install GDAL==3.4.3
-#RUN poetry add gdal==3.4.3
-RUN poetry install
-#RUN poetry build
-#RUN poetry shell
+RUN ogrinfo --version
+
+RUN pip install GDAL==3.6.2
+RUN pip install geodatacrawler==1.3.4
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]
