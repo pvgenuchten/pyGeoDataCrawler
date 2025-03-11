@@ -31,9 +31,9 @@ RUN \
 	&& update-locale LANG=${LOCALE} \
 	&& echo "For ${TZ} date=$(date)" && echo "Locale=$(locale)" 
 
-RUN ogrinfo --version
+# RUN ogrinfo --version
 
 RUN pip install GDAL==3.6.2
 RUN pip install geodatacrawler==1.3.4
 
-ENTRYPOINT ["tail", "-f", "/dev/null"]
+ENTRYPOINT []

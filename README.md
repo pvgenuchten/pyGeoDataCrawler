@@ -210,3 +210,13 @@ GDAL 3.3.2, released 2021/09/01
 - trigger semantic release
 - poetry build
 - poetry publish
+
+## Docker hub
+
+```
+docker build -t pvgenuchten/geodatacrawler:1.3.4 .
+docker login
+docker push pvgenuchten/geodatacrawler:1.3.4
+docker tag pvgenuchten/geodatacrawler:1.3.4 pvgenuchten/geodatacrawler:latest
+docker push pvgenuchten/geodatacrawler:latest
+```

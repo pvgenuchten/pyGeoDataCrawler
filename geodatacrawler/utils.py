@@ -3,7 +3,7 @@ from unidecode import unidecode
 from bs4 import BeautifulSoup  
 import os
 import time
-import datetime
+from datetime import datetime,date
 import sys
 import pprint
 import urllib.request
@@ -79,7 +79,13 @@ def indexFile(fname, extension):
         content['crs-str'] = str(d.GetProjection())
         crs = crs2code(d.GetProjection())
         content['crs'] = crs
-
+        try:
+            creation_time = os.path.getctime(fname)
+            content['created'] = datetime.fromtimestamp(creation_time)
+            modification_time = os.path.getmtime(fname)
+            content['modified'] = datetime.fromtimestamp(modification_time)
+        except:
+            None
         meta = d.GetMetadata()
         m2 = parseDC(meta,'') # see if meta has dc properties
         dict_merge(content,m2)
@@ -125,6 +131,14 @@ def indexFile(fname, extension):
         content['crs-str'] = str(srs)
         content['crs'] = crs2code(srs)
 
+        try:
+            creation_time = os.path.getctime(fname)
+            content['created'] = datetime.fromtimestamp(creation_time)
+            modification_time = os.path.getmtime(fname)
+            content['modified'] = datetime.fromtimestamp(modification_time)
+        except:
+            None
+        
         # check if local mcf exists
         # else use mcf from a parent folder
         # add new parameters to mcf
@@ -646,7 +660,7 @@ def getDate(fname):
 '''
 parse a dublin core record to MCF
 '''
-def parseDC(dct,fname):
+def parseDC(dct, fname):
 
     # make sure dcparams are available and not None
     dcparams = ("contentStatus,lastPrinted,revision,version,creator,url,copyright,lastModifiedBy,modified,created," + 
@@ -672,7 +686,7 @@ def parseDC(dct,fname):
         
     exp['identification']['abstract'] = ' '.join(i for i in [dct.get('description'),dct.get('abstract')] if i)
 
-    exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', datetime.date.today())) 
+    exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', date.today())) 
     ct3=[]
     for ct in "author,publisher,creator".split(','):    
         ct2 = dct.get(ct,'')
@@ -740,12 +754,12 @@ def parseISO(strXML, u):
         md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
         strXML = etree.tostring(md[0])
 
-    #try:
-    iso_os = ISO19139OutputSchema()
-    md = iso_os.import_(strXML)
-    return md
-    #except Exception as e:
-    #    print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+    try:
+        iso_os = ISO19139OutputSchema()
+        md = iso_os.import_(strXML)
+        return md
+    except Exception as e:
+        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
 
 
 def owsCapabilities2md (url, protocol):

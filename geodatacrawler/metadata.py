@@ -106,9 +106,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
         skipSubfolders = cnf2['skip-subfolders']
 
     for file in Path(target_path).iterdir():
-
-
-
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and not fname.startswith('.') and not fname.startswith('~') and not str(file).endswith('.gdb'):
             # go one level deeper
@@ -271,7 +268,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     break
 
                         if (hasFile):
-                            cnt = indexFile(dataFile, dataFile.split('.').pop()) 
+                            cnt = indexFile(dataFile, dataFile.split('.').pop()) #returns a DC record, with spatial extension
                             if 'metadata' not in orig or orig['metadata'] is None: 
                                 orig['metadata'] = {}
                             orig['metadata'] = orig.get('metadata',{})
@@ -434,7 +431,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     # print ('Indexing file ' + fname)
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
-                        md = indexFile(fname, extension) 
+                        md = parseDC(indexFile(fname, extension),fname) 
                         checkId(md,'-'.join(i for i in str(os.path.join(relPath,fn)).split(os.sep) if i not in ['','.','..',' ']),prefix)
                         if 'identification' not in md or md['identification'] is None:
                             md['identification'] = {}
@@ -533,7 +530,7 @@ def importCsv(dir,dir_out,map='',sep='',enc='',cluster='',prefix=''):
                             fn = safeFileName(myid)
                             if len(fn) > 32:
                                 fn = fn[:32]
-                            elif len(fn) < 16: ## extent title with organisation else part of abstract
+                            elif len(fn) < 8: ## extent title with organisation else part of abstract
                                 letters = yMcf['identification'].get('abstract')
                                 for c in yMcf.get('contact',{}).keys():
                                     letters = yMcf['contact'][c].get('organization',yMcf['contact'][c].get('individualname','None'))
