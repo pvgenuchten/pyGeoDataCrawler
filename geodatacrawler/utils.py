@@ -56,7 +56,7 @@ def indexFile(fname, extension):
         print(f"file {fname} indexed as GRID_FILE_TYPE")
         d = gdal.Open( fname )
  
-        content['spatial'] = {'datatype': 'raster', 'geomtype': 'raster'}
+        content['spatial'] = {'datatype': 'grid', 'geomtype': 'raster'}
 
         #print(gdal.Info(d))
 
@@ -123,7 +123,16 @@ def indexFile(fname, extension):
             b = i.GetExtent()
             fc = i.GetFeatureCount()
             srs = i.GetSpatialRef()
-            tp = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType()).lower()
+            tp0 = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType()).lower()
+            # mcf types: complex, composite, curve, point, solid, surface
+            if tp0 in ['line string','polyline','line','curve','multiline','wkblinestring']:
+                tp = 'curve'
+            elif tp0 in ['polygon','multipolygon','surface']:
+                tp = 'surface'
+            elif tp0 in ['point','multipoint']:
+                tp = 'point' 
+            else:
+                tp = 'complex'
             attrs = {}
             for f in range(i.GetLayerDefn().GetFieldCount()):
                 fld = i.GetLayerDefn().GetFieldDefn(f)
@@ -132,6 +141,7 @@ def indexFile(fname, extension):
                 fn = fld.GetName()
                 attrs[fn] = ftt
         content['content_info'] = {"attributes":attrs}
+        # mcf datatypes: vector - grid - textTable - tin - stereoModel - video
         content['spatial'] = {'datatype': 'vector', 'geomtype': tp}
         # change axis order
         bounds = [b[0],b[2],b[1],b[3]]

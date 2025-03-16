@@ -172,12 +172,11 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 fn = sf.split('/').pop()
                                 fb,e = fn.rsplit('.', 1) 
                                 fileinfo = indexFile(sf, e)
-                                if (fileinfo.get('spatial',{}).get('datatype','').lower() == "raster"):
-                                    lyr['type'] = 'raster'
-                                elif (fileinfo.get('spatial',{}).get('geomtype','').lower() in ["linestring", "line", "multiline", "polyline", "wkblinestring"]):
+                                if (fileinfo.get('spatial',{}).get('datatype','') == "grid"):
+                                    lyr['type'] = 'grid'
+                                elif (fileinfo.get('spatial',{}).get('geomtype','') == "curve"):
                                     lyr['type'] = 'line'
-                                elif (fileinfo.get('spatial',{}).get('geomtype','') in ["point", "multipoint", "wkbpoint",
-                                                            'table']):  # table is suggested for CSV, which is usually point (or none)
+                                elif (fileinfo.get('spatial',{}).get('geomtype','') == "point"):  # table is suggested for CSV, which is usually point (or none)
                                     lyr['type'] = 'point'
                                 else:
                                     lyr['type'] = 'polygon'
@@ -192,7 +191,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
                                 # object has 1 bounds in 4326 and may have one in original projection
                                 for extent in fileinfo.get('identification',{}).get('extents',{}).get('spatial',[]):
-                                    
+
                                     if '4326' in str(extent.get('crs','')) and len(extent.get('bbox',[])) == 4:
                                         updateBounds(extent.get('bbox'), config['map']['extent'])
                                         lyr['wgs84_bounds'] = extent.get('bbox')
@@ -228,8 +227,8 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                             else:
                                                 print(f'Stylefile {stylefile} does not exist')
                                         
-                                        elif lyr['type']=='raster': # set colors for range, only first band supported
-                                            new_class_string2 += colorCoding('raster',band1.get('min',0), band1.get('max',0),style_reference)
+                                        elif lyr['type']=='grid': # set colors for range, only first band supported
+                                            new_class_string2 += colorCoding('grid',band1.get('min',0), band1.get('max',0),style_reference)
                                         else: # vector
                                             new_class_string2 += colorCoding(fileinfo.get('spatial',{}).get('geomtype',''),None,None,style_reference)
                                 else:
@@ -239,7 +238,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     new_class_string2 = pkg_resources.read_text(templates, 'class-' + lyr['type'] + '.tpl')
 
                                 if 'template' not in ly.keys() or ly['template'] != '': # custom template
-                                    if lyr['type']=='raster':
+                                    if lyr['type']=='grid':
                                         ly['template'] = 'grid.html'
                                         if not os.path.exists(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html')):
                                             gridinfofile = pkg_resources.read_text(templates, 'grid.html')
@@ -255,7 +254,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                             f.write(vectorinfofile) 
 
                                 # prepend nodata on grids
-                                if lyr['type']=='raster' and str(band1.get('nodata','')) not in ['None','','NaN']:
+                                if lyr['type']=='grid' and str(band1.get('nodata','')) not in ['None','','NaN']:
                                     new_class_string2 = 'PROCESSING "NODATA=' + str(band1.get('nodata', '')) + '"\n' + new_class_string2
 
                                 new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
@@ -287,7 +286,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     if mdlinktype in ['OGC:WMS']:
                                         if not checkLink(cnt, mdlinktype, config):
                                             addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
-                                    elif fileinfo.get('spatial',{}).get('datatype','').lower() == 'raster' and mdlinktype == 'OGC:WCS':
+                                    elif fileinfo.get('spatial',{}).get('datatype','').lower() == 'grid' and mdlinktype == 'OGC:WCS':
                                         if not checkLink(cnt, mdlinktype, config):
                                             addLink(mdlinktype, fb, file, relPath2, mf['name'], config)
                                     elif fileinfo.get('spatial',{}).get('datatype','').lower() == 'vector' and mdlinktype == 'OGC:WFS' :
@@ -367,7 +366,7 @@ sets a color coding for a layer
 '''
 def colorCoding(geomtype,min,max,style):
 
-    if geomtype=='raster':
+    if geomtype=='grid':
         prop = 'pixel'
     else: #vector
         prop = style.get('property')
@@ -435,7 +434,7 @@ def msStyler(geomtype,cls):
     symbol = cls.get('symbol','circle')
     size = float(cls.get('size') or 5) 
     width = float(cls.get('width') or 0.1)
-    if geomtype=='raster':
+    if geomtype=='grid':
         return f'COLOR "{color}"\n'
     elif geomtype=='point':
       return f'SYMBOL "{symbol}"\nCOLOR "{color}"\nSIZE {str(size)}\nOUTLINECOLOR "{linecolor}"\nOUTLINEWIDTH 0.1\n'
