@@ -151,11 +151,11 @@
         </gmd:MD_BrowseGraphic>
       </gmd:graphicOverview>
       {% endif %}
-      {% for key, value in record['identification']['keywords'].items() %}
+      {% for key, value in record['identification'].get('keywords',{}).items() %}
       {% if value.get('keywords',[]) | length > 0 %}
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
-        {% set keywords = get_charstring(value.get('keywords'), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate')) %}
+        {% set keywords = get_charstring(value.get('keywords',[]), record.get('metadata',{}).get('language'), record.get('metadata',{}).get('language_alternate')) %}
         {% if keywords[0] is not none %}
         {% if keywords[1] is none %}
           {# No language_alternate is specified #}

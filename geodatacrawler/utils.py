@@ -29,10 +29,25 @@ def indexFile(fname, extension):
 
     # else extract metadata from file (or update metadata from file content)
     content = {
-        'title': os.path.splitext(os.path.basename(fname))[0],
-        'url': fname,
-        'date': getDate(fname),
-        'size': getSize(fname)
+        "metadata": { 
+            "identifier": fname, 
+            "datestamp":  getDate(fname)
+        },
+        "identification": {
+            "title": os.path.splitext(os.path.basename(fname))[0],
+            "dates": {
+                "creation": getDate(fname, 'creation'),
+                "modified": getDate(fname)
+            }
+        },
+        "distribution": {
+            "d1": {
+                'url': fname,
+                'name': os.path.basename(fname),
+                'type': 'WWW:LINK',
+                'size': getSize(fname)
+            }
+        }
     }
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
@@ -41,8 +56,7 @@ def indexFile(fname, extension):
         print(f"file {fname} indexed as GRID_FILE_TYPE")
         d = gdal.Open( fname )
  
-        content['datatype'] = 'raster'
-        content['geomtype'] = 'raster'
+        content['spatial'] = {'datatype': 'raster', 'geomtype': 'raster'}
 
         #print(gdal.Info(d))
 
@@ -69,34 +83,30 @@ def indexFile(fname, extension):
                     "units": str(srcband.GetUnitType() or '')
             })
 
-        content['bounds'] = [ulx, lry, lrx, uly]
+        bounds = [ulx, lry, lrx, uly]
+        if 'extents' not in content['identification']:
+            content['identification']['extents'] = {}
         if crs2code(d.GetProjection()) == 'EPSG:4326':
-            content['bounds_wgs84'] = content['bounds']
+            bounds_wgs84 = bounds
+            content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
         else:
-            content['bounds_wgs84'] = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
-                
-        #which crs
-        content['crs-str'] = str(d.GetProjection())
-        crs = crs2code(d.GetProjection())
-        content['crs'] = crs
-        try:
-            creation_time = os.path.getctime(fname)
-            content['created'] = datetime.fromtimestamp(creation_time)
-            modification_time = os.path.getmtime(fname)
-            content['modified'] = datetime.fromtimestamp(modification_time)
-        except:
-            None
-        meta = d.GetMetadata()
-        m2 = parseDC(meta,'') # see if meta has dc properties
-        dict_merge(content,m2)
+            bounds_wgs84 = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
+            crs = crs2code(d.GetProjection())
+            content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
 
+        # get tiff metadata, and merge initial content
+        meta = parseDC(d.GetMetadata(),fname)
+        dict_merge(meta,content)
+        content = meta
         content['content_info'] = {
                 'type': 'image',
                 'dimensions': bands,
                 'meta':  meta
             }
         d = None
-
+       
+        return content
+    
     elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
         print(f"file {fname} indexed as VECTOR_FILE_TYPE")
 
@@ -110,7 +120,7 @@ def indexFile(fname, extension):
             b = i.GetExtent()
             fc = i.GetFeatureCount()
             srs = i.GetSpatialRef()
-            tp = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType())
+            tp = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType()).lower()
             attrs = {}
             for f in range(i.GetLayerDefn().GetFieldCount()):
                 fld = i.GetLayerDefn().GetFieldDefn(f)
@@ -119,26 +129,21 @@ def indexFile(fname, extension):
                 fn = fld.GetName()
                 attrs[fn] = ftt
         content['content_info'] = {"attributes":attrs}
-        content['datatype'] = "vector"
-        content['geomtype'] = tp
-        # change axis order
-        content['bounds'] = [b[0],b[2],b[1],b[3]]
-        if crs2code(srs) == 'EPSG:4326':
-            content['bounds_wgs84'] = content['bounds']
-        else:
-            content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
-        
-        content['crs-str'] = str(srs)
-        content['crs'] = crs2code(srs)
 
-        try:
-            creation_time = os.path.getctime(fname)
-            content['created'] = datetime.fromtimestamp(creation_time)
-            modification_time = os.path.getmtime(fname)
-            content['modified'] = datetime.fromtimestamp(modification_time)
-        except:
-            None
+        content['spatial'] = {'datatype': 'vector', 'geomtype': tp}
+
+
+        # change axis order
+        bounds = [b[0],b[2],b[1],b[3]]
+        if crs2code(srs) == 'EPSG:4326':
+            content['identification']['extents']['spatial'] = [{"bbox": bounds, "crs": 4326}]
+        else:
+            bounds_wgs84 = reprojectBounds(bounds,srs,4326)
+            crs = crs2code(srs)
+            content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
         
+        return content
+
         # check if local mcf exists
         # else use mcf from a parent folder
         # add new parameters to mcf
@@ -150,12 +155,15 @@ def indexFile(fname, extension):
 
     elif (extension.lower() in ['xlsm', 'xlsx', 'xltx', 'xltm']):
         print(f"file {fname} indexed as Excel")
-        md = parseExcel(fname)
+        md = parseDC(parseExcel(fname))
+
         if md:
-            return md
+            return dict_merge(md,content)
+        else:
+            return content
     else:
         print(f"file {fname} indexed as other type")
-    return (content)
+        return content
 
 # from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
 def dict_merge(dct, merge_dct):
@@ -648,10 +656,13 @@ def getSize(fname):
         print("WARNING: Error getting size",fname,str(e)) 
     return s
 
-def getDate(fname):
-    d='unknown'
+def getDate(fname, type="modified"):
+    d = None
     try:
-        d= time.ctime(os.path.getmtime(fname))
+        if type=='modified':
+            d = time.ctime(os.path.getmtime(fname))
+        else: 
+            d = time.ctime(os.path.getctime(fname))
     except Exception as e:
         print("WARNING: Error getting date",fname,str(e)) 
     return d
@@ -712,7 +723,7 @@ def parseDC(dct, fname):
     exp['identification']['keywords'] = {'default': {'keywords': ct4}}
 
     exp['spatial']['datatype'] = dct.get('datatype','')
-    exp['spatial']['geomtype'] = dct.get('geomtype','')
+    exp['spatial']['geomtype'] = dct.get('geomtype','').lower()
     exp['identification']['status'] = dct.get('contentStatus','' )
     exp['identification']['language'] = dct.get('language','')
     exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
@@ -721,17 +732,21 @@ def parseDC(dct, fname):
         exp['identification']['license'] = {'url': dct.get('license')}
     elif dct.get('license') not in [None,'']:
         exp['identification']['license'] = {'name': dct.get('license')}
-    if 'extents' not in exp['identification'].keys():
-        exp['identification']['extents'] = {}
+    bnds = None
     if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
         bnds = dct.get('bounds_wgs84')
         crs = 4326
-    else:
-        bnds = dct.get('bounds',[])
+    elif 'bounds' in dct and dct.get('bounds') is not None:
+        bnds = dct.get('bounds')
         crs = dct.get('crs','4326')
-    exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
+    if bnds:
+        if 'extents' not in exp['identification'].keys():
+            exp['identification']['extents'] = {}
+        exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
     exp['content_info'] = dct.get('content_info',{})  
-    exp['content_info']['type'] = dct.get('type','')
+    exp['metadata']['hierarchylevel'] = 'dataset'
+    if dct.get('type') not in [None,'']:
+        exp['content_info']['type'] = dct.get('type','')
     
     if dct['url'] not in [None,'']:
         exp['distribution']['www'] = {'name': fname, 'url': dct['url'], 'type': 'www'}

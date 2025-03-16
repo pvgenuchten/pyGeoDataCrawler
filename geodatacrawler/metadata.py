@@ -268,22 +268,23 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     break
 
                         if (hasFile):
-                            cnt = indexFile(dataFile, dataFile.split('.').pop()) #returns a DC record, with spatial extension
-                            if 'metadata' not in orig or orig['metadata'] is None: 
-                                orig['metadata'] = {}
-                            orig['metadata'] = orig.get('metadata',{})
-                            orig['metadata']['datestamp'] = cnt.get('modified', datetime.date.today())  
-                            if 'identification' not in orig or orig['identification'] is None: 
-                                orig['identification'] = {}
-                            orig['identification']['extents'] = orig['identification'].get('extents',{})
-                            if 'bounds_wgs84' in cnt and cnt.get('bounds_wgs84') is not None:
-                                bnds = cnt.get('bounds_wgs84')
-                                crs = 4326
-                            else:
-                                bnds = cnt.get('bounds',[])
-                                crs = cnt.get('crs',4326)
-                            orig['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
-                            orig['content_info'] = cnt.get('content_info',{})
+                            cnt = indexFile(dataFile, dataFile.split('.').pop()) #returns a mcf record
+ 
+                            # default title is filename, unless populated from embedded metadata, so adopt it if it is not filename
+                            keeptitle = False
+                            if cnt.get('identification',{}).get('title') not in [None,'',dataFile.split('.').pop()]:
+                                keeptitle = True
+                                oldtitle = orig.get('identification',{}).get('title')
+                            # keep identification
+                            oldID = orig.get('metadata',{}).get('identifier')
+
+                            newMd = dict_merge(cnt, orig)
+                            if keeptitle:
+                                orig['identification']['title'] = oldtitle
+                            if oldID not in [None,'']:
+                                orig['metadata']['identifier'] = oldID
+
+                            orig = newMd
 
                         skipOWS = False # not needed if this is fetched from remote
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
@@ -409,8 +410,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     localFile = isDistributionLocal(v.get('url',''),target_path)
                                     if localFile:
                                         hasFile = localFile
-                                        cnt = indexFile(target_path+os.sep+hasFile, extension)
-                                        md2 = parseDC(cnt,fname)
+                                        md2 = indexFile(target_path+os.sep+hasFile, extension)
                                         if (md2['identification']['title']):
                                             md2['identification']['title'] = None
                                         if md2['metadata']['identifier']:
@@ -431,31 +431,30 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     # print ('Indexing file ' + fname)
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
-                        md = parseDC(indexFile(fname, extension),fname) 
-                        checkId(md,'-'.join(i for i in str(os.path.join(relPath,fn)).split(os.sep) if i not in ['','.','..',' ']),prefix)
-                        if 'identification' not in md or md['identification'] is None:
-                            md['identification'] = {}
-                        if 'title' not in md['identification'] or md['identification']['title'] in [None,'']:
-                            md['identification']['title'] = str(os.path.join(relPath,fn)).replace(os.sep,' ')
-                        if 'distribution' not in md or md['distribution'] is None:
-                            md['distribution'] = {}
-                        if len(md['distribution'].keys()) == 0:
-                            if webdavUrl:
-                                lnk = webdavUrl+"/"+relPath+"/"+fn+'.'+extension
-                            else:
-                                lnk = str(file)
-                            md['distribution']['local'] = { 'url':lnk, 'type': 'WWW:LINK', 'name':fn+'.'+extension }
+                        md = indexFile(fname, extension) 
+                        if md:
+                            checkId(md,'-'.join(i for i in str(os.path.join(relPath,fn)).split(os.sep) if i not in ['','.','..',' ']),prefix)
+                            if 'identification' not in md.keys() or md['identification'] is None:
+                                md['identification'] = {}
+                            if 'distribution' not in md.keys() or md['distribution'] is None:
+                                md['distribution'] = {}
+                            if len(md['distribution'].keys()) == 0:
+                                if webdavUrl:
+                                    lnk = webdavUrl+"/"+relPath+"/"+fn+'.'+extension
+                                else:
+                                    lnk = str(file)
+                                md['distribution']['local'] = { 'url':lnk, 'type': 'WWW:LINK', 'name':fn+'.'+extension }
 
-                        if not os.path.exists(os.path.join(dir_out,relPath)):
-                            print('create folder',os.path.join(dir_out,relPath))
-                            os.makedirs(os.path.join(dir_out,relPath))
-                            
-                        # write yf
-                        try:
-                            with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
-                                yaml.dump(md, f, sort_keys=False)
-                        except Exception as e:
-                            print('Failed to dump yaml:',e)
+                            if not os.path.exists(os.path.join(dir_out,relPath)):
+                                print('create folder',os.path.join(dir_out,relPath))
+                                os.makedirs(os.path.join(dir_out,relPath))
+                                
+                            # write yf
+                            try:
+                                with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
+                                    yaml.dump(md, f, sort_keys=False)
+                            except Exception as e:
+                                print('Failed to dump yaml:',e)
                 else:
                     None
                     # print('Skipping {}, no indexable file type: {}'.format(fname, extension))

@@ -34,6 +34,6 @@ RUN \
 # RUN ogrinfo --version
 
 RUN pip install GDAL==3.6.2
-RUN pip install geodatacrawler==1.3.4
+RUN pip install geodatacrawler==1.3.5
 
 ENTRYPOINT []

@@ -205,6 +205,7 @@ GDAL 3.3.2, released 2021/09/01
 
 ### Release
 
+- poetry run pytest tests
 - update [__init__.py](__init__.py) and [pyproject.toml](pyproject.toml)
 - push changes
 - trigger semantic release
