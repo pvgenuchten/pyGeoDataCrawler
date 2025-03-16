@@ -38,6 +38,6 @@ def test_vector_colorCoding():
     assert clsstr.find('56a1b3') > -1
 
 def test_proj():
-        f = indexFile("./demo/maize.tif","tif")
+        f = indexFile("./demo/grid/maize.tif","tif")
         foo = reprojectBounds([1537886.2528828776, -1063208.0434537493, 2424636.2528828774, 88791.95654625073], osr.SpatialReference(f['crs-str']), 4326)
         assert foo[0]==168.48720712208527 
