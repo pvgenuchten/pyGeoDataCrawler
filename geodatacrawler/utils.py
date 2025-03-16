@@ -20,7 +20,6 @@ from geodatacrawler import GDCCONFIG
 import importlib.metadata
 
 
-
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
 
@@ -38,7 +37,8 @@ def indexFile(fname, extension):
             "dates": {
                 "creation": getDate(fname, 'creation'),
                 "modified": getDate(fname)
-            }
+            },
+            "extents": {}
         },
         "distribution": {
             "d1": {
@@ -83,33 +83,36 @@ def indexFile(fname, extension):
                     "units": str(srcband.GetUnitType() or '')
             })
 
-        bounds = [ulx, lry, lrx, uly]
-        if 'extents' not in content['identification']:
-            content['identification']['extents'] = {}
-        if crs2code(d.GetProjection()) == 'EPSG:4326':
+        acrs = d.GetProjection()
+        bounds = [float(ulx), float(lry), float(lrx), float(uly)]
+        if acrs:    
+            if crs2code(acrs) == 'EPSG:4326':
+                bounds_wgs84 = bounds
+                content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
+            else:
+                acrs2 = osr.SpatialReference(acrs)
+                if acrs2:
+                    bounds_wgs84 = reprojectBounds(bounds,acrs2,4326)
+                    crs = crs2code(d.GetProjection())
+                    content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
+        else: # assume 4326 if file has no projection
             bounds_wgs84 = bounds
             content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
-        else:
-            bounds_wgs84 = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
-            crs = crs2code(d.GetProjection())
-            content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
 
         # get tiff metadata, and merge initial content
         meta = parseDC(d.GetMetadata(),fname)
-        dict_merge(meta,content)
-        content = meta
+        dict_merge(content, meta)
         content['content_info'] = {
                 'type': 'image',
                 'dimensions': bands,
-                'meta':  meta
+                'meta': d.GetMetadata()
             }
         d = None
-       
+
         return content
     
     elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
         print(f"file {fname} indexed as VECTOR_FILE_TYPE")
-
         tp=""
         srs=""
         b=""
@@ -129,18 +132,17 @@ def indexFile(fname, extension):
                 fn = fld.GetName()
                 attrs[fn] = ftt
         content['content_info'] = {"attributes":attrs}
-
         content['spatial'] = {'datatype': 'vector', 'geomtype': tp}
-
-
         # change axis order
         bounds = [b[0],b[2],b[1],b[3]]
-        if crs2code(srs) == 'EPSG:4326':
-            content['identification']['extents']['spatial'] = [{"bbox": bounds, "crs": 4326}]
-        else:
-            bounds_wgs84 = reprojectBounds(bounds,srs,4326)
-            crs = crs2code(srs)
-            content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
+
+        if srs:
+            if crs2code(srs) == 'EPSG:4326':
+                content['identification']['extents']['spatial'] = [{"bbox": bounds, "crs": 4326}]
+            else:
+                bounds_wgs84 = reprojectBounds(bounds,srs,4326)
+                crs = crs2code(srs)
+                content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
         
         return content
 
@@ -660,9 +662,9 @@ def getDate(fname, type="modified"):
     d = None
     try:
         if type=='modified':
-            d = time.ctime(os.path.getmtime(fname))
+            d = datetime.fromtimestamp(os.path.getmtime(fname)).strftime('%Y-%m-%dT%H:%M:%S')
         else: 
-            d = time.ctime(os.path.getctime(fname))
+            d = datetime.fromtimestamp(os.path.getctime(fname)).strftime('%Y-%m-%dT%H:%M:%S')
     except Exception as e:
         print("WARNING: Error getting date",fname,str(e)) 
     return d

@@ -278,17 +278,15 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                             # keep identification
                             oldID = orig.get('metadata',{}).get('identifier')
 
-                            newMd = dict_merge(cnt, orig)
+                            dict_merge(orig, cnt)
                             if keeptitle:
                                 orig['identification']['title'] = oldtitle
                             if oldID not in [None,'']:
                                 orig['metadata']['identifier'] = oldID
 
-                            orig = newMd
-
                         skipOWS = False # not needed if this is fetched from remote
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
-                        if resolve and orig['metadata'].get('dataseturi','').startswith('http'):
+                        if resolve and orig.get('metadata',{}).get('dataseturi','').startswith('http'):
                             for u in orig['metadata']['dataseturi'].split(';'):
                                 md = fetchMetadata(u)
                                 dict_merge(orig, md)

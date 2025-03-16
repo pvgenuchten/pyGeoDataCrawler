@@ -185,35 +185,30 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 sld = None
                                 if (os.path.exists(str(file).replace('yml','sld'))):
                                     sld = str(file).replace('yml','sld')
+                                # initial
+                                lyr['wgs84_bounds'] = [-180,-90,180,90] 
+                                lyr['bounds'] = None
+                                lyr['crs'] = 'epsg:4326' 
 
-                                lyr['bounds'] = [-180,-90,180,90]
-                                lyr['crs'] = 'epsg:4326'
-                                origcrs = None
-                                origbounds = None
-
-                                # bounds_wgs84 also exists, but often empty
-                                # else cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('bbox')
-                                for b in fileinfo.get('identification',{}).get('extents',{}).get('spatial',[]):
-                                    if '4326' in str(b.get('crs','')) and b.get('bounds') not in [None,'']:
-                                        updateBounds(b.get('bounds'), config['map']['extent'])
-                                        lyr['bounds'] = b.get('bounds')
-                                    elif b.get('crs') not in [None,''] and b.get('bounds') not in [None,'']:
-                                        origcrs = b.get('crs')
-                                        lyr['bounds'] = b.get('bounds')
-                                    elif b.get('bounds') not in [None,'']: # assume 4326 
-                                        lyr['bounds'] = b.get('bounds')
-                                    else: # use world bounds in 4326
-                                        None
+                                # object has 1 bounds in 4326 and may have one in original projection
+                                for extent in fileinfo.get('identification',{}).get('extents',{}).get('spatial',[]):
+                                    
+                                    if '4326' in str(extent.get('crs','')) and len(extent.get('bbox',[])) == 4:
+                                        updateBounds(extent.get('bbox'), config['map']['extent'])
+                                        lyr['wgs84_bounds'] = extent.get('bbox')
+                                    elif extent.get('crs') not in [None,''] and len(extent.get('bbox')) == 4:
+                                        lyr['crs'] = extent.get('crs')
+                                        lyr['bounds'] = extent.get('bbox')
 
                                 # default val from index.yml
                                 projections = ly.get('projections', 'epsg:4326 epsg:3857');
                                 # first take value from file, take srs-str, else take override value from index.yml, else  4326
                                 # else cnt['crs'] = cnt.get('identification').get('extents',{}).get('spatial',[{}])[0].get('crs')
-                                if origcrs not in [None,'']:
-                                    projections = origcrs + ' ' + projections
-                                    lyr['crs'] = origcrs
+                                if lyr['crs'] != 'epsg:4326' :
+                                    projections = lyr['crs']  + ' ' + projections
                                 else: 
                                     lyr['crs'] = 'epsg:4326'
+                                    lyr['bounds'] = lyr['wgs84_bounds']
 
                                 # evaluate if a custom style is defined
                                 band1 = fileinfo.get('content_info',{}).get('dimensions',[{}])[0]
