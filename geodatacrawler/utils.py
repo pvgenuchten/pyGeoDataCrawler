@@ -164,10 +164,11 @@ def indexFile(fname, extension):
 
     elif (extension.lower() in ['xlsm', 'xlsx', 'xltx', 'xltm']):
         print(f"file {fname} indexed as Excel")
-        md = parseDC(parseExcel(fname))
+        md = parseDC(parseExcel(fname),fname)
 
         if md:
-            return dict_merge(md,content)
+            dict_merge(md,content)
+            return md
         else:
             return content
     else:
