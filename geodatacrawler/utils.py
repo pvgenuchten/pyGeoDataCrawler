@@ -133,14 +133,11 @@ def indexFile(fname, extension):
                 tp = 'point' 
             else:
                 tp = 'complex'
-            attrs = {}
+            attrs = []
             for f in range(i.GetLayerDefn().GetFieldCount()):
                 fld = i.GetLayerDefn().GetFieldDefn(f)
-                ftt = fld.GetTypeName()
-                # ft = fld.GetFieldTypeName(ftt)
-                fn = fld.GetName()
-                attrs[fn] = ftt
-        content['content_info'] = {"attributes":attrs}
+                attrs.append({'name': fld.GetName(), 'type': fld.GetTypeName() }) 
+        content['content_info'] = {"attributes": attrs}
         # mcf datatypes: vector - grid - textTable - tin - stereoModel - video
         content['spatial'] = {'datatype': 'vector', 'geomtype': tp}
         # change axis order
