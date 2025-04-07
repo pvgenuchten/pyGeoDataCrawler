@@ -732,8 +732,10 @@ def parseDC(dct, fname):
                 ct4 += [k.strip() for k in ct2.replace(',',';').split(';') if k != '']
     exp['identification']['keywords'] = {'default': {'keywords': ct4}}
 
-    exp['spatial']['datatype'] = dct.get('datatype','')
-    exp['spatial']['geomtype'] = dct.get('geomtype','').lower()
+    if 'datatype' in dct:
+       exp['spatial']['datatype'] = dct.get('datatype','')
+    if 'geomtype' in dct:
+       exp['spatial']['geomtype'] = dct.get('geomtype','').lower()
     exp['identification']['status'] = dct.get('contentStatus','' )
     exp['identification']['language'] = dct.get('language','')
     exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
@@ -777,14 +779,15 @@ def parseISO(strXML, u):
                 nsmap[ns[0]] = ns[1]
 
         md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
-        strXML = etree.tostring(md[0])
+        if md and len(md) > 0:
+            strXML = etree.tostring(md[0])
 
-    try:
-        iso_os = ISO19139OutputSchema()
-        md = iso_os.import_(strXML)
-        return md
-    except Exception as e:
-        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+            try:
+                iso_os = ISO19139OutputSchema()
+                md = iso_os.import_(strXML)
+                return md
+            except Exception as e:
+                print('no iso19139 at',u,e) # could parse url to find param id (csw request)
 
 
 def owsCapabilities2md (url, protocol):
