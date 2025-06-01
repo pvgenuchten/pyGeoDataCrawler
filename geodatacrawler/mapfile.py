@@ -261,8 +261,8 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
                                 strLr = new_layer_string.format(name=fb,
                                     title='"'+cnt.get('identification',{}).get('title', '')+'"',
-                                    abstract='"'+cnt.get('identification',{}).get('abstract', '')+'"',
-                                    type=lyr['type'],
+                                    abstract='"'+cnt.get('identification',{}).get('abstract', '').replace('\r','').replace('\n',' ').replace("'","")+'"',
+                                    type=(lyr['type']=='grid'?'raster':lyr['type']),
                                     path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
                                     template=ly.get('template'),
                                     projection=lyr['crs'],
