@@ -1,0 +1,18 @@
+mcf:
+  version: 1.0
+identification:
+  title: my favourite cities
+  abstract: a funky layer
+robot:
+  style: foo
+distribution:
+  WMS:
+    url: map?service=WMS&amp;request=GetCapabilities
+    type: OGC:WMS
+    name: line
+    description: ''
+  WFS:
+    url: map?service=WFS&amp;request=GetCapabilities
+    type: OGC:WFS
+    name: line
+    description: ''

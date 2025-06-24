@@ -1,0 +1,468 @@
+{
+    "type": "FeatureCollection",
+    "totalFeatures": 24,
+    "features": [
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.1",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    41.1162229999999,
+                    -2.094547
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 0,
+                "FID_": 1,
+                "Name": "Rewa",
+                "lat": -2.094547,
+                "long": 41.116223
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.2",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    41.0713319999999,
+                    -2.139478
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 1,
+                "FID_": 2,
+                "Name": "Majunguni",
+                "lat": -2.139478,
+                "long": 41.071332
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.3",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    41.02472,
+                    -2.163027
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 2,
+                "FID_": 3,
+                "Name": "Chipopo",
+                "lat": -2.163027,
+                "long": 41.02472
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.4",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    41.0189,
+                    -2.20683
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 3,
+                "FID_": 4,
+                "Name": "Kiweni",
+                "lat": -2.20683,
+                "long": 41.0189
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.5",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.36380030760621,
+                    -4.664492539150336
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 4,
+                "FID_": 5,
+                "Name": "Wasini Women MBW",
+                "lat": -4.659823,
+                "long": 39.364384
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.6",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.466125488600596,
+                    -4.512695312838275
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 5,
+                "FID_": 6,
+                "Name": "Mwaembe",
+                "lat": -4.472509,
+                "long": 39.491596
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.7",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.45349121085087,
+                    -4.558776855067663
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 7,
+                "FID_": 8,
+                "Name": "Munje",
+                "lat": -4.50046,
+                "long": 39.472614
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.8",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.98893,
+                    -3.345254
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 8,
+                "FID_": 9,
+                "Name": "Mida creek MBW",
+                "lat": -3.345254,
+                "long": 39.98893
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.9",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    40.117128,
+                    -3.29414
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 9,
+                "FID_": 10,
+                "Name": "Dabaso MBW",
+                "lat": -3.29414,
+                "long": 40.117128
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.10",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.8469419999999,
+                    -3.762762
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 10,
+                "FID_": 11,
+                "Name": "Kuruwitu",
+                "lat": -3.762762,
+                "long": 39.846942
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.11",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.830187,
+                    -3.82118
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 11,
+                "FID_": 12,
+                "Name": "Bureni",
+                "lat": -3.82118,
+                "long": 39.830187
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.12",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.78247070306065,
+                    -3.9166870115961387
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 12,
+                "FID_": 13,
+                "Name": "Kanamai Mradi",
+                "lat": -4.065023,
+                "long": 39.693851
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.13",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.704284667803336,
+                    -3.921386718422184
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 13,
+                "FID_": 14,
+                "Name": "Majaoni Youth MBW",
+                "lat": -4.059742,
+                "long": 39.679458
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.14",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.595650000000035,
+                    -4.254259999999931
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 14,
+                "FID_": 15,
+                "Name": "Nyari Kikadini",
+                "lat": -4.257607,
+                "long": 39.599765
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.15",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.57505000000003,
+                    -4.318949999999916
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 15,
+                "FID_": 16,
+                "Name": "Trade winds",
+                "lat": -4.295815,
+                "long": 39.587369
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.16",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.50649764021576,
+                    -4.413798726552742
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 16,
+                "FID_": 17,
+                "Name": "Gazi Women MBW",
+                "lat": -4.367935,
+                "long": 39.560183
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.17",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.4072109999999,
+                    -4.674234
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 17,
+                "FID_": 18,
+                "Name": "Mkwiro",
+                "lat": -4.674234,
+                "long": 39.407211
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.18",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.386138,
+                    -4.65022
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 18,
+                "FID_": 19,
+                "Name": "Shimoni",
+                "lat": -4.65022,
+                "long": 39.386138
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.19",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.3312219999999,
+                    -4.645414
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 19,
+                "FID_": 20,
+                "Name": "Kibuyuni",
+                "lat": -4.645414,
+                "long": 39.331222
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.20",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.27608,
+                    -4.623792
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 20,
+                "FID_": 21,
+                "Name": "Majoreni",
+                "lat": -4.623792,
+                "long": 39.27608
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.21",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.235491,
+                    -4.66245
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 21,
+                "FID_": 22,
+                "Name": "Vanga",
+                "lat": -4.66245,
+                "long": 39.235491
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.22",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.26958465576172,
+                    -4.652915954589844
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 22,
+                "FID_": 23,
+                "Name": "Jimbo",
+                "lat": -4.669365,
+                "long": 39.226904
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.23",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.36041599999999,
+                    -4.652916000000005
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 23,
+                "FID_": 24,
+                "Name": "Wasini",
+                "lat": -4.654362,
+                "long": 39.36346
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "locally_managed_marine_areas_kenya.24",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    39.492114393090986,
+                    -4.472326085731734
+                ]
+            },
+            "geometry_name": "the_geom",
+            "properties": {
+                "FID1": 5,
+                "FID_": 6,
+                "Name": "Mkunguni",
+                "lat": -4.472509,
+                "long": 39.491596
+            }
+        }
+    ],
+    "crs": {
+        "type": "name",
+        "properties": {
+            "name": "urn:ogc:def:crs:EPSG::4326"
+        }
+    }
+}

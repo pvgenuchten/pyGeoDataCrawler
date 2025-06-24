@@ -36,10 +36,13 @@ def mapForDir(dir, dir_out, dir_out_mode, recursive):
         recursive = False
     print(f'Creating a mapfile for dir {dir} to {dir_out} as {dir_out_mode}, recursive: {recursive}')
 
+    # initial config (from program folder)
+    config = initialConfig(dir,dir_out)
+    processPath("", config, dir_out, dir_out_mode, recursive)
+
+def initialConfig(dir,dir_out):    
     # core metadata gets populated by merging the index.yaml content from parent folders
     initialMetadata = load_default_metadata("update")
-
-    # initial config (from program folder)
     config = initialMetadata.get('robot',{})
     config['rootDir'] = dir   
     config['outDir'] = os.getenv('pgdc_dir_out') or dir_out
@@ -51,8 +54,7 @@ def mapForDir(dir, dir_out, dir_out_mode, recursive):
     config['map'] = {"styles":[{"classes":"#56a1b3,#80bfab,#abdda4,#c7e8ad,#e3f4b6,#ffffbf,#fee4a0,#fec980,#fdae61,#f07c4a,#e44b33,#d7191c".split(',')}]}
     config['map']['extent'] = [None,None,None,None]
     initialMetadata['robot'] = config
-
-    processPath("", initialMetadata, dir_out, dir_out_mode, recursive)
+    return initialMetadata
 
 def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
@@ -73,9 +75,8 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
 
     # set up header
     mf["name"] = list(filter(None, str(os.path.abspath(config['rootDir']) + os.sep + relPath).split(os.sep))).pop()
-
-    mf["web"]["metadata"]["ows_title"] = coreMetadata.get('identification').get("title", mf["name"])
-    mf["web"]["metadata"]["ows_abstract"] = coreMetadata.get('identification').get("abstract", "")
+    mf["web"]["metadata"]["ows_title"] = (coreMetadata.get('identification',{}).get("title") or "map").replace('\r','').replace('\n','').replace("'","")
+    mf["web"]["metadata"]["ows_abstract"] = (coreMetadata.get('identification',{}).get("abstract", "") or "").replace('\r','').replace('\n','').replace("'","")
     kw = []
     for k,v in coreMetadata.get('identification',{}).get('keywords',{}).items():
             if v.get('keywords') and len(v.get('keywords')) > 0 :
@@ -247,8 +248,8 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     else:
                                         ly['template'] = ly.get('template', f'{fb}.html')
                                         vectorinfofile = "<!-- MapServer Template -->\n"
-                                        for attr in fileinfo.get('content_info',{}).get('attributes',{}).keys():
-                                            vectorinfofile += f"{attr}: [{attr}]<br/>"
+                                        for attr in (fileinfo.get('content_info',{}).get('attributes',[]) or []):
+                                            vectorinfofile += f"{attr.get('title',attr['name'])}: [{attr['name']}] {attr.get('unit','')}<br/>\n"
                                         vectorinfofile += "<hr/>"
                                         with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),fb+'.html'), 'w') as f:
                                             f.write(vectorinfofile) 
@@ -260,9 +261,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 new_layer_string = pkg_resources.read_text(templates, 'layer.tpl')
 
                                 strLr = new_layer_string.format(name=fb,
-                                    title='"'+cnt.get('identification',{}).get('title', '')+'"',
-                                    abstract='"'+cnt.get('identification',{}).get('abstract', '').replace('\r','').replace('\n',' ').replace("'","")+'"',
-                                    type=(lyr['type']=='grid'?'raster':lyr['type']),
+                                    title='"'+str(cnt.get('identification',{}).get('title', '')).replace('\r','').replace('\n','').replace("'","")+'"',
+                                    abstract='"'+str(cnt.get('identification',{}).get('abstract', '')).replace('\r','').replace('\n','').replace("'","")+'"',
+                                    type=('raster' if lyr['type']=='grid' else lyr['type']),
                                     path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
                                     template=ly.get('template'),
                                     projection=lyr['crs'],

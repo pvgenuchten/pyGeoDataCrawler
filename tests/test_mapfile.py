@@ -1,6 +1,7 @@
-from geodatacrawler.mapfile import colorCoding
+from geodatacrawler.mapfile import colorCoding, processPath, initialConfig
 from geodatacrawler.utils import indexFile, reprojectBounds
 from osgeo import osr
+import os,shutil
 
 def test_raster_colorCoding():
     clsstr = colorCoding('grid',2,10,[[100,255,0],'100 255 50','#000000'])
@@ -41,3 +42,8 @@ def test_proj():
         f = indexFile("./demo/grid/era5-temperature_2m.tif","tif")
         #foo = reprojectBounds([1537886.2528828776, -1063208.0434537493, 2424636.2528828774, 88791.95654625073], osr.SpatialReference(f['crs-str']), 4326)
         #assert foo[0]==168.48720712208527 
+
+def test_map():
+     processPath('',initialConfig('./demo/map', './tests/map'), "./tests/map", "flat", "false")
+     assert os.path.exists('./tests/map/map.map')
+     shutil.rmtree('./tests/map')

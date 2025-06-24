@@ -781,14 +781,15 @@ def parseISO(strXML, u):
         md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
         if md and len(md) > 0:
             strXML = etree.tostring(md[0])
-
-            try:
-                iso_os = ISO19139OutputSchema()
-                md = iso_os.import_(strXML)
-                return md
-            except Exception as e:
-                print('no iso19139 at',u,e) # could parse url to find param id (csw request)
-
+        else:
+            print('no MD_Metadata in xml')
+    try:
+        iso_os = ISO19139OutputSchema()
+        md = iso_os.import_(strXML)
+        return md
+    except Exception as e:
+        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+        
 
 def owsCapabilities2md (url, protocol):
     lyrmd  = None; 
