@@ -215,9 +215,9 @@ GDAL 3.3.2, released 2021/09/01
 ## Docker hub
 
 ```
-docker build -t pvgenuchten/geodatacrawler:1.3.9 .
+docker build -t pvgenuchten/geodatacrawler:1.3.10 .
 docker login
-docker push pvgenuchten/geodatacrawler:1.3.9
-docker tag pvgenuchten/geodatacrawler:1.3.9 pvgenuchten/geodatacrawler:latest
+docker push pvgenuchten/geodatacrawler:1.3.10
+docker tag pvgenuchten/geodatacrawler:1.3.10 pvgenuchten/geodatacrawler:latest
 docker push pvgenuchten/geodatacrawler:latest
 ```
