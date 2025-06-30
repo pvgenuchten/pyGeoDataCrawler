@@ -1,12 +1,15 @@
 LAYER
     NAME    '{name}'
     TYPE    {type}
-    DATA    '{path}'
+    CONNECTIONTYPE {connectiontype}
+    CONNECTION  "{connection}"
+    DATA "{data}"
     PROJECTION
         '{projection}'
     END
     EXTENT '{extent}'
     STATUS on
+    PROCESSING 'CLOSE_CONNECTION=DEFER'
     Template '{template}'
 
     METADATA

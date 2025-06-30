@@ -127,8 +127,8 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                 print('Skip file',fname)
             # process the file
             elif '.' in str(file):
-                base, extension = str(file).rsplit('.', 1)
-                fn = base.split(os.sep).pop()
+                fn, extension  = os.path.splitext(os.path.basename(file))
+                extension = extension.replace('.','')
 
                 # do we trigger on ymls only, or also on spatial files? --> No 
                 # to go back to the file from the yml works via name matching or distribution(s)?
@@ -173,8 +173,14 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 fn = os.path.basename(sf)
                                 fb, ext = os.path.splitext(fn)
                                 fileinfo = indexFile(sf)
+                                lyr['connectiontype'] = 'OGR'
+                                dataPath = os.path.join('' if dir_out_mode == 'nested' else relPath,fn) # nested or flat
+                                lyr['data'] = fb # layername
+                                lyr['connection'] = dataPath
                                 if (fileinfo.get('spatial',{}).get('datatype','') == "grid"):
                                     lyr['type'] = 'grid'
+                                    lyr['data'] = dataPath
+                                    lyr['connection'] = ''
                                 elif (fileinfo.get('spatial',{}).get('geomtype','') == "curve"):
                                     lyr['type'] = 'line'
                                 elif (fileinfo.get('spatial',{}).get('geomtype','') == "point"):  # table is suggested for CSV, which is usually point (or none)
@@ -184,7 +190,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 # check if a SLD exists
                                 sld = None
                                 if (os.path.exists(str(file).replace('yml','sld'))):
-                                    sld = str(file).replace('yml','sld')
+                                    sld = fb+'.sld'
                                 # initial
                                 lyr['wgs84_bounds'] = [-180,-90,180,90] 
                                 lyr['bounds'] = None
@@ -215,7 +221,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 new_class_string2 = ""
 
                                 if sld: # reference sld file in current folder
-                                    new_class_string2 += f"STYLEITEM: \"sld://{os.path.join('' if dir_out_mode == 'nested' else relPath,sld)}\"\n"
+                                    new_class_string2 += f"STYLEITEM \"sld://{os.path.join('' if dir_out_mode == 'nested' else relPath,sld)}\"\n"
                                 elif 'styles' in ly.keys() and isinstance(ly['styles'],list):
                                     for style_reference in ly.get("styles", []): 
                                         # if isinstance(style_reference,dict): 
@@ -267,9 +273,11 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     title='"'+str(cnt.get('identification',{}).get('title', '')).replace('\r','').replace('\n','').replace("'","")+'"',
                                     abstract='"'+str(cnt.get('identification',{}).get('abstract', '')).replace('\r','').replace('\n','').replace("'","")+'"',
                                     type=('raster' if lyr['type']=='grid' else lyr['type']),
-                                    path=os.path.join('' if dir_out_mode == 'nested' else relPath,fn), # nested or flat
                                     template=ly.get('template'),
                                     projection=lyr['crs'],
+                                    connection=lyr['connection'],
+                                    connectiontype=lyr['connectiontype'],
+                                    data=lyr['data'],
                                     projections=projections,
                                     extent=" ".join(map(str,lyr['bounds'])),
                                     id="fid", # todo, use field from attributes, config?
