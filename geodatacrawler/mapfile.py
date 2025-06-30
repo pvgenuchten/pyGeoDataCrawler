@@ -170,9 +170,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                             # process the files in dataFile
                             for sf in dataFile:
                                 print('processing file' + sf)
-                                fn = sf.split('/').pop()
-                                fb,e = fn.rsplit('.', 1) 
-                                fileinfo = indexFile(sf, e)
+                                fn = os.path.basename(sf)
+                                fb, ext = os.path.splitext(fn)
+                                fileinfo = indexFile(sf)
                                 if (fileinfo.get('spatial',{}).get('datatype','') == "grid"):
                                     lyr['type'] = 'grid'
                                 elif (fileinfo.get('spatial',{}).get('geomtype','') == "curve"):
@@ -239,6 +239,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     new_class_string2 = pkg_resources.read_text(templates, 'class-' + lyr['type'] + '.tpl')
 
                                 if 'template' not in ly.keys() or ly['template'] != '': # custom template
+                                    # check if folder exists
+                                    if not os.path.exists(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''))):
+                                        os.makedirs(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else '')))
                                     if lyr['type']=='grid':
                                         ly['template'] = 'grid.html'
                                         if not os.path.exists(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),'grid.html')):

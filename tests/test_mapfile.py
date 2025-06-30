@@ -1,5 +1,7 @@
 from geodatacrawler.mapfile import colorCoding, processPath, initialConfig
 from geodatacrawler.utils import indexFile, reprojectBounds
+import mappyfile
+from mappyfile.validator import Validator
 from osgeo import osr
 import os,shutil
 
@@ -39,11 +41,16 @@ def test_vector_colorCoding():
     assert clsstr.find('56a1b3') > -1
 
 def test_proj():
-        f = indexFile("./demo/grid/era5-temperature_2m.tif","tif")
+        f = indexFile("./demo/grid/era5-temperature_2m.tif")
         #foo = reprojectBounds([1537886.2528828776, -1063208.0434537493, 2424636.2528828774, 88791.95654625073], osr.SpatialReference(f['crs-str']), 4326)
         #assert foo[0]==168.48720712208527 
 
 def test_map():
-     processPath('',initialConfig('./demo/map', './tests/map'), "./tests/map", "flat", "false")
-     assert os.path.exists('./tests/map/map.map')
-     shutil.rmtree('./tests/map')
+    processPath('',initialConfig('./demo/map', './tests/map'), "./tests/map", "flat", "false")
+    assert os.path.exists('./tests/map/map.map')
+    d = mappyfile.open('./tests/map/map.map')
+    v = Validator()
+    errors = v.validate(d, add_comments=True, version=8.4)
+    print(errors)
+    assert len(errors) == 0
+    shutil.rmtree('./tests/map')

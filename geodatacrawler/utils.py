@@ -23,29 +23,33 @@ import importlib.metadata
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
 
-def indexFile(fname, extension):
+def indexFile(fpath):
     # todo: check if a .xml file exists, to use as title/abstract etc
-
+    fname, extension = os.path.splitext(os.path.basename(fpath))
+    extension = extension.replace('.','')
     # else extract metadata from file (or update metadata from file content)
     content = {
+        "mcf": {
+            "version": 1.0 
+        },
         "metadata": { 
             "identifier": fname, 
-            "datestamp":  getDate(fname)
+            "datestamp":  getDate(fpath)
         },
         "identification": {
-            "title": os.path.splitext(os.path.basename(fname))[0],
+            "title": os.path.splitext(os.path.basename(fpath))[0],
             "dates": {
-                "creation": getDate(fname, 'creation'),
-                "modified": getDate(fname)
+                "creation": getDate(fpath, 'creation'),
+                "modified": getDate(fpath)
             },
             "extents": {}
         },
         "distribution": {
             "d1": {
-                'url': fname,
-                'name': os.path.basename(fname),
+                'url': fpath,
+                'name': fname,
                 'type': 'WWW:LINK',
-                'size': getSize(fname)
+                'size': getSize(fpath)
             }
         }
     }
@@ -53,8 +57,8 @@ def indexFile(fname, extension):
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
     # get spatial properties
     if extension.lower() in GDCCONFIG["GRID_FILE_TYPES"]:
-        print(f"file {fname} indexed as GRID_FILE_TYPE")
-        d = gdal.Open( fname )
+        print(f"file {fpath} indexed as GRID_FILE_TYPE")
+        d = gdal.Open( fpath )
  
         content['spatial'] = {'datatype': 'grid', 'geomtype': 'raster'}
 
@@ -100,7 +104,7 @@ def indexFile(fname, extension):
             content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
 
         # get tiff metadata, and merge initial content
-        meta = parseDC(d.GetMetadata(),fname)
+        meta = parseDC(d.GetMetadata(),fpath)
         dict_merge(content, meta)
         content['content_info'] = {
                 'type': 'image',
@@ -117,7 +121,7 @@ def indexFile(fname, extension):
         srs=""
         b=""
         attrs = {}
-        ds = ogr.Open(fname)
+        ds = ogr.Open(fpath)
         for i in ds:
             ln = i.GetName()
             b = i.GetExtent()
@@ -163,8 +167,8 @@ def indexFile(fname, extension):
         # create iso
 
     elif (extension.lower() in ['xlsm', 'xlsx', 'xltx', 'xltm']):
-        print(f"file {fname} indexed as Excel")
-        md = parseDC(parseExcel(fname),fname)
+        print(f"file {fpath} indexed as Excel")
+        md = parseDC(parseExcel(fpath),fname)
 
         if md:
             dict_merge(md,content)
@@ -354,7 +358,7 @@ def checkOWSLayer(url, protocol, name, identifier, title, cnf):
         
         records = harvestCSW(url, constraints, pagesize, maxrecords)
         if records and len(records) > 0:
-            capmd['distribution'] = recs
+            capmd['distribution'] = records
         else:
             print(f'No records harvested from {url}, using filter {filter}')
         return capmd

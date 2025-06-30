@@ -268,7 +268,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     break
 
                         if (hasFile):
-                            cnt = indexFile(dataFile, dataFile.split('.').pop()) #returns a mcf record
+                            cnt = indexFile(dataFile) #returns a mcf record
  
                             # default title is filename, unless populated from embedded metadata, so adopt it if it is not filename
                             keeptitle = False
@@ -408,7 +408,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     localFile = isDistributionLocal(v.get('url',''),target_path)
                                     if localFile:
                                         hasFile = localFile
-                                        md2 = indexFile(target_path+os.sep+hasFile, extension)
+                                        md2 = indexFile(target_path+os.sep+hasFile)
                                         if (md2['identification']['title']):
                                             md2['identification']['title'] = None
                                         if md2['metadata']['identifier']:
@@ -429,7 +429,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     # print ('Indexing file ' + fname)
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
-                        md = indexFile(fname, extension) 
+                        md = indexFile(fname) 
                         if md:
                             checkId(md,'-'.join(i for i in str(os.path.join(relPath,fn)).split(os.sep) if i not in ['','.','..',' ']),prefix)
                             if 'identification' not in md.keys() or md['identification'] is None:
