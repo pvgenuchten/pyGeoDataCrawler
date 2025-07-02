@@ -262,6 +262,13 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                         vectorinfofile += "<hr/>"
                                         with open(os.path.join(dir_out,(relPath if dir_out_mode == 'nested' else ''),fb+'.html'), 'w') as f:
                                             f.write(vectorinfofile) 
+                                
+
+                                layerIdentifier = "id"
+                                if lyr['type']!='grid':
+                                    attrs = fileinfo.get('content_info',{}).get('attributes')
+                                    if attrs and len(attrs)>0:
+                                        layerIdentifier = attrs[0].get('name','id') # use attrs[0] as identifier
 
                                 # prepend nodata on grids
                                 if lyr['type']=='grid' and str(band1.get('nodata','')) not in ['None','','NaN']:
@@ -280,7 +287,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     data=lyr['data'],
                                     projections=projections,
                                     extent=" ".join(map(str,lyr['bounds'])),
-                                    id="fid", # todo, use field from attributes, config?
+                                    id=layerIdentifier,
                                     mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
                                     classes=new_class_string2)
                                 #except Exception as e:
