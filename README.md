@@ -33,7 +33,7 @@ The tools are typically called from commandline or a bash script.
 ### Index metadata
 
 ```
-crawl-metadata --mode=init --dir=/myproject/data [--out-dir=/mnt/myoutput]
+crawl-metadata --mode=init --dir=/myproject/data [--dir-out=/mnt/myoutput]
 ```
 
 Mode explained:
