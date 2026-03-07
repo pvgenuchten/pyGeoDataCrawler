@@ -343,7 +343,7 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "pygeometa"
-version = "0.16.0"
+version = "0.19.0"
 description = "pygeometa is a Python package to generate metadata for geospatial datasets"
 category = "main"
 optional = false
