@@ -12,14 +12,14 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 PyYAML = "^6.0"
 mappyfile = "^1.0.0"
 GDAL = "^3.6.2"
 # GDAL = "3.6.4"
 pyproj = "^3.4.0"
-OWSLib = "0.31.0"
-pygeometa = "0.16.0"
+OWSLib = "^0.31.0"
+pygeometa = "^0.19.0"
 Jinja2 = "^3.1.2"
 jinja2-time = "^0.2.0"
 bibtexparser = "^2.0.0b2"
