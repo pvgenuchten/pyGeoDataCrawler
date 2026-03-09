@@ -3,7 +3,7 @@ from unidecode import unidecode
 from bs4 import BeautifulSoup  
 import os
 import time
-import datetime
+from datetime import datetime,date
 import sys
 import pprint
 import urllib.request
@@ -20,29 +20,47 @@ from geodatacrawler import GDCCONFIG
 import importlib.metadata
 
 
-
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
 
-def indexFile(fname, extension):
+def indexFile(fpath):
     # todo: check if a .xml file exists, to use as title/abstract etc
-
+    fname, extension = os.path.splitext(os.path.basename(fpath))
+    extension = extension.replace('.','')
     # else extract metadata from file (or update metadata from file content)
     content = {
-        'title': os.path.splitext(os.path.basename(fname))[0],
-        'url': fname,
-        'date': getDate(fname),
-        'size': getSize(fname)
+        "mcf": {
+            "version": 1.0 
+        },
+        "metadata": { 
+            "identifier": fname, 
+            "datestamp":  getDate(fpath)
+        },
+        "identification": {
+            "title": os.path.splitext(os.path.basename(fpath))[0],
+            "dates": {
+                "creation": getDate(fpath, 'creation'),
+                "modified": getDate(fpath)
+            },
+            "extents": {}
+        },
+        "distribution": {
+            "d1": {
+                'url': fpath,
+                'name': fname,
+                'type': 'WWW:LINK',
+                'size': getSize(fpath)
+            }
+        }
     }
 
     # get file time (create + modification), see https://stackoverflow.com/questions/237079/how-to-get-file-creation-modification-date-times-in-python
     # get spatial properties
     if extension.lower() in GDCCONFIG["GRID_FILE_TYPES"]:
-        print(f"file {fname} indexed as GRID_FILE_TYPE")
-        d = gdal.Open( fname )
+        print(f"file {fpath} indexed as GRID_FILE_TYPE")
+        d = gdal.Open( fpath )
  
-        content['datatype'] = 'raster'
-        content['geomtype'] = 'raster'
+        content['spatial'] = {'datatype': 'grid', 'geomtype': 'raster'}
 
         #print(gdal.Info(d))
 
@@ -69,60 +87,75 @@ def indexFile(fname, extension):
                     "units": str(srcband.GetUnitType() or '')
             })
 
-        content['bounds'] = [ulx, lry, lrx, uly]
-        if crs2code(d.GetProjection()) == 'EPSG:4326':
-            content['bounds_wgs84'] = content['bounds']
-        else:
-            content['bounds_wgs84'] = reprojectBounds([float(ulx), float(lry), float(lrx), float(uly)],osr.SpatialReference(d.GetProjection()),4326)
-                
-        #which crs
-        content['crs-str'] = str(d.GetProjection())
-        crs = crs2code(d.GetProjection())
-        content['crs'] = crs
+        acrs = d.GetProjection()
+        bounds = [float(ulx), float(lry), float(lrx), float(uly)]
+        if acrs:    
+            if crs2code(acrs) == 'EPSG:4326':
+                bounds_wgs84 = bounds
+                content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
+            else:
+                acrs2 = osr.SpatialReference(acrs)
+                if acrs2:
+                    bounds_wgs84 = reprojectBounds(bounds,acrs2,4326)
+                    crs = crs2code(d.GetProjection())
+                    content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
+        else: # assume 4326 if file has no projection
+            bounds_wgs84 = bounds
+            content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
 
-        meta = d.GetMetadata()
-        dict_merge(content,meta)
-
+        # get tiff metadata, and merge initial content
+        meta = parseDC(d.GetMetadata(),fpath)
+        dict_merge(content, meta)
         content['content_info'] = {
                 'type': 'image',
                 'dimensions': bands,
-                'meta':  meta
+                'meta': d.GetMetadata()
             }
         d = None
 
+        return content
+    
     elif extension.lower() in GDCCONFIG["VECTOR_FILE_TYPES"]:
         print(f"file {fname} indexed as VECTOR_FILE_TYPE")
-
         tp=""
         srs=""
         b=""
         attrs = {}
-        ds = ogr.Open(fname)
+        ds = ogr.Open(fpath)
         for i in ds:
             ln = i.GetName()
             b = i.GetExtent()
             fc = i.GetFeatureCount()
             srs = i.GetSpatialRef()
-            tp = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType())
-            attrs = {}
+            tp0 = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType()).lower()
+            # mcf types: complex, composite, curve, point, solid, surface
+            if tp0 in ['line string','polyline','line','curve','multiline','wkblinestring']:
+                tp = 'curve'
+            elif tp0 in ['polygon','multipolygon','surface']:
+                tp = 'surface'
+            elif tp0 in ['point','multipoint']:
+                tp = 'point' 
+            else:
+                tp = 'complex'
+            attrs = []
             for f in range(i.GetLayerDefn().GetFieldCount()):
                 fld = i.GetLayerDefn().GetFieldDefn(f)
-                ftt = fld.GetTypeName()
-                # ft = fld.GetFieldTypeName(ftt)
-                fn = fld.GetName()
-                attrs[fn] = ftt
-        content['content_info'] = {"attributes":attrs}
-        content['datatype'] = "vector"
-        content['geomtype'] = tp
+                attrs.append({'name': fld.GetName(), 'type': fld.GetTypeName() }) 
+        content['content_info'] = {"attributes": attrs}
+        # mcf datatypes: vector - grid - textTable - tin - stereoModel - video
+        content['spatial'] = {'datatype': 'vector', 'geomtype': tp}
         # change axis order
-        content['bounds'] = [b[0],b[2],b[1],b[3]]
-        if crs2code(srs) == 'EPSG:4326':
-            content['bounds_wgs84'] = content['bounds']
-        else:
-            content['bounds_wgs84'] = reprojectBounds(content['bounds'],srs,4326)
+        bounds = [b[0],b[2],b[1],b[3]]
+
+        if srs:
+            if crs2code(srs) == 'EPSG:4326':
+                content['identification']['extents']['spatial'] = [{"bbox": bounds, "crs": 4326}]
+            else:
+                bounds_wgs84 = reprojectBounds(bounds,srs,4326)
+                crs = crs2code(srs)
+                content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
         
-        content['crs-str'] = str(srs)
-        content['crs'] = crs2code(srs)
+        return content
 
         # check if local mcf exists
         # else use mcf from a parent folder
@@ -134,13 +167,17 @@ def indexFile(fname, extension):
         # create iso
 
     elif (extension.lower() in ['xlsm', 'xlsx', 'xltx', 'xltm']):
-        print(f"file {fname} indexed as Excel")
-        md = parseExcel(fname)
+        print(f"file {fpath} indexed as Excel")
+        md = parseDC(parseExcel(fpath),fname)
+
         if md:
+            dict_merge(md,content)
             return md
+        else:
+            return content
     else:
         print(f"file {fname} indexed as other type")
-    return (content)
+        return content
 
 # from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
 def dict_merge(dct, merge_dct):
@@ -321,7 +358,7 @@ def checkOWSLayer(url, protocol, name, identifier, title, cnf):
         
         records = harvestCSW(url, constraints, pagesize, maxrecords)
         if records and len(records) > 0:
-            capmd['distribution'] = recs
+            capmd['distribution'] = records
         else:
             print(f'No records harvested from {url}, using filter {filter}')
         return capmd
@@ -462,11 +499,22 @@ def parse_report_file(file):
             return 'Is JSON'
         return 'Is INVALID'
 
+def valideMD(md):
+    if ('identification' in md and 'title' in md['identification'] and md['identification']['title'] not in [None,'']
+        and 'metadata' in md and 'identifier' in md['metadata'] and md['metadata']['identifier'] not in [None,'']):
+        return True
+    else:
+        return False
+
 def fetchMetadata(u):
+
+    fullMD = False;
     ''' fetch metadata of a url, first determine type then parse it '''
     # analyse url
     if not (u.strip().startswith('http') or u.strip().startswith('//')):
         return None
+
+    md = {}
 
     if 'doi.org/' in u:
         doi = u.split('doi.org/').pop()
@@ -486,6 +534,9 @@ def fetchMetadata(u):
                 raise ValueError(f"Error fetch doi {doi} from datacite, Code: {resp.status_code}")
         except Exception as e:
             print(f"Error fetch doi {doi}, {str(e)}. Trying Crossref")
+
+        if not valideMD(md):
+            print('No valid md, try crossref')
             try:
                 resp = fetchUrl("https://api.crossref.org/works/"+doi)
                 if resp.status_code == 200:
@@ -493,20 +544,22 @@ def fetchMetadata(u):
                     return parseCrossref(md, doi)
             except Exception as e:
                 print(f"Error fetch doi {doi}, {str(e)}. Trying bibtex")
-                try:
-                #if 0==0: 
-                    import bibtexparser
-                    resp = fetchUrl(u,{"Accept": "application/x-bibtex; charset=utf-8", 'User-agent': 'Mozilla/5.0'})
-                    article = bibtexparser.parse_string(resp.text)
-                    for first_entry in article.entries:
-                        md = {"identifier": safeFileName(first_entry.key) }
-                        md['type'] = first_entry.entry_type
-                        for f in first_entry.fields:
-                            md[f.key] = f.value                     
-                        return parseDC(md,md.get('title',safeFileName(u.split('doi.org/').pop())))
-                    return None
-                except Exception as e:
-                    print("Failed to parse bibtex ",u,str(e))
+                
+        if not valideMD(md):       
+            try:
+            #if 0==0: 
+                import bibtexparser
+                resp = fetchUrl(u,{"Accept": "application/x-bibtex; charset=utf-8", 'User-agent': 'Mozilla/5.0'})
+                article = bibtexparser.parse_string(resp.text)
+                for first_entry in article.entries:
+                    md = {"identifier": safeFileName(first_entry.key) }
+                    md['type'] = first_entry.entry_type
+                    for f in first_entry.fields:
+                        md[f.key] = f.value                     
+                    return parseDC(md,md.get('title',safeFileName(u.split('doi.org/').pop())))
+                return None
+            except Exception as e:
+                print("Failed to parse bibtex ",u,str(e))
 
     else:
         # Try a generic request
@@ -578,8 +631,8 @@ def parseCrossref(md, u):
 
 def parseDataCite(attrs, u):
     # some datacite embeds content in data.attributes
-    if ('data' in attrs and 'attributes' in attrs['data']):
-        attrs = attrs.get('data',{}).get('attributes',{})
+    if ('attributes' in attrs):
+        attrs = attrs.get('attributes',{})
     md = {
         'metadata': { 
             'identifier': safeFileName(u.split('://')[-1].split('?')[0]),
@@ -617,10 +670,13 @@ def getSize(fname):
         print("WARNING: Error getting size",fname,str(e)) 
     return s
 
-def getDate(fname):
-    d='unknown'
+def getDate(fname, type="modified"):
+    d = None
     try:
-        d= time.ctime(os.path.getmtime(fname))
+        if type=='modified':
+            d = datetime.fromtimestamp(os.path.getmtime(fname)).strftime('%Y-%m-%dT%H:%M:%S')
+        else: 
+            d = datetime.fromtimestamp(os.path.getctime(fname)).strftime('%Y-%m-%dT%H:%M:%S')
     except Exception as e:
         print("WARNING: Error getting date",fname,str(e)) 
     return d
@@ -629,11 +685,11 @@ def getDate(fname):
 '''
 parse a dublin core record to MCF
 '''
-def parseDC(dct,fname):
+def parseDC(dct, fname):
 
     # make sure dcparams are available and not None
     dcparams = ("contentStatus,lastPrinted,revision,version,creator,url,copyright,lastModifiedBy,modified,created," + 
-                "title,subject,description,identifier,language,keywords,category,year").split(',')
+                "title,subject,description,identifier,language,keywords,category,year,abstract,format,licence,source,type,units").split(',')
     for p in dcparams:
         if p not in dct.keys() or dct[p] == None:
             dct[p] = ""
@@ -653,9 +709,9 @@ def parseDC(dct,fname):
     if exp['metadata']['identifier'].startswith('http'):
         exp['metadata']['dataseturi'] = exp['metadata']['identifier'];
         
-    exp['identification']['abstract'] = dct.get('description','')
+    exp['identification']['abstract'] = ' '.join(i for i in [dct.get('description'),dct.get('abstract')] if i)
 
-    exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', datetime.date.today())) 
+    exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', date.today())) 
     ct3=[]
     for ct in "author,publisher,creator".split(','):    
         ct2 = dct.get(ct,'')
@@ -680,22 +736,34 @@ def parseDC(dct,fname):
                 ct4 += [k.strip() for k in ct2.replace(',',';').split(';') if k != '']
     exp['identification']['keywords'] = {'default': {'keywords': ct4}}
 
-    exp['spatial']['datatype'] = dct.get('datatype','')
-    exp['spatial']['geomtype'] = dct.get('geomtype','')
+    if 'datatype' in dct:
+       exp['spatial']['datatype'] = dct.get('datatype','')
+    if 'geomtype' in dct:
+       exp['spatial']['geomtype'] = dct.get('geomtype','').lower()
     exp['identification']['status'] = dct.get('contentStatus','' )
     exp['identification']['language'] = dct.get('language','')
     exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
     exp['identification']['rights'] = dct.get('copyright','')
-    if 'extents' not in exp['identification'].keys():
-        exp['identification']['extents'] = {}
+    if dct.get('license','').startswith('http'):
+        exp['identification']['license'] = {'url': dct.get('license')}
+    elif dct.get('license') not in [None,'']:
+        exp['identification']['license'] = {'name': dct.get('license')}
+    bnds = None
     if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
         bnds = dct.get('bounds_wgs84')
         crs = 4326
-    else:
-        bnds = dct.get('bounds',[])
+    elif 'bounds' in dct and dct.get('bounds') is not None:
+        bnds = dct.get('bounds')
         crs = dct.get('crs','4326')
-    exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
+    if bnds:
+        if 'extents' not in exp['identification'].keys():
+            exp['identification']['extents'] = {}
+        exp['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
     exp['content_info'] = dct.get('content_info',{})  
+    exp['metadata']['hierarchylevel'] = 'dataset'
+    if dct.get('type') not in [None,'']:
+        exp['content_info']['type'] = dct.get('type','')
+    
     if dct['url'] not in [None,'']:
         exp['distribution']['www'] = {'name': fname, 'url': dct['url'], 'type': 'www'}
     return exp
@@ -715,15 +783,17 @@ def parseISO(strXML, u):
                 nsmap[ns[0]] = ns[1]
 
         md = doc.xpath('gmd:MD_Metadata', namespaces=nsmap)
-        strXML = etree.tostring(md[0])
-
-    #try:
-    iso_os = ISO19139OutputSchema()
-    md = iso_os.import_(strXML)
-    return md
-    #except Exception as e:
-    #    print('no iso19139 at',u,e) # could parse url to find param id (csw request)
-
+        if md and len(md) > 0:
+            strXML = etree.tostring(md[0])
+        else:
+            print('no MD_Metadata in xml')
+    try:
+        iso_os = ISO19139OutputSchema()
+        md = iso_os.import_(strXML)
+        return md
+    except Exception as e:
+        print('no iso19139 at',u,e) # could parse url to find param id (csw request)
+        
 
 def owsCapabilities2md (url, protocol):
     lyrmd  = None; 

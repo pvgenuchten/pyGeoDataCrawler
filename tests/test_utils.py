@@ -1,11 +1,11 @@
 from geodatacrawler.utils import dict_merge,indexFile
 
 def test_indexFile():
-    r = indexFile('./demo/line.shp','shp')
-    assert r['datatype'] == 'vector'
-    assert r['geomtype'] == 'Line String'
-    r = indexFile('./demo/nested/raster2.tif','tif')
-    assert r['datatype'] == 'raster'
+    r = indexFile('./demo/vector/line.shp')
+    assert r['spatial']['datatype'] == 'vector'
+    assert r['spatial']['geomtype'] == 'curve'
+    r = indexFile('./demo/nested/raster2.tif')
+    assert r['spatial']['datatype'] == 'grid'
     assert r['content_info']['dimensions'][0]['max'] == 120.0
 
 def test_dict_merge():

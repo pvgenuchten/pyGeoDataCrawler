@@ -65,6 +65,8 @@ robot:
 
 Some GDAL (raster) or OGR (vector) formats, such as [FileGDB](https://gdal.org/drivers/vector/openfilegdb.html), [GeoPackage](https://gdal.org/drivers/vector/gpkg.html) and [parquet](https://gdal.org/drivers/vector/parquet.html) require an additional plugin. Verify for each of the commom formats in your organisation, if the relevant GDAL plugins are installed.
 
+For grid files, the metadata will be extracted from the .aux.xml file. You can use the Dublin Core terms; title, description, license, ... in the grid metadata.
+
 ## Create mapfile
 
 The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A `index.yml` configuraton file is expected at the root of the folder to be indexed, if not, it will be created.
@@ -203,8 +205,19 @@ GDAL 3.3.2, released 2021/09/01
 
 ### Release
 
+- poetry run pytest tests
 - update [__init__.py](__init__.py) and [pyproject.toml](pyproject.toml)
 - push changes
 - trigger semantic release
 - poetry build
 - poetry publish
+
+## Docker hub
+
+```
+docker build -t pvgenuchten/geodatacrawler:1.3.11 .
+docker login
+docker push pvgenuchten/geodatacrawler:1.3.11
+docker tag pvgenuchten/geodatacrawler:1.3.11 pvgenuchten/geodatacrawler:latest
+docker push pvgenuchten/geodatacrawler:latest
+```

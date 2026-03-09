@@ -1,0 +1,12 @@
+<PAMDataset>
+  <PAMRasterBand band="1">
+    <Description>era5-temperature_2m</Description>
+    <Metadata>
+      <MDI key="STATISTICS_MAXIMUM">2966</MDI>
+      <MDI key="STATISTICS_MEAN">2924.283379693</MDI>
+      <MDI key="STATISTICS_MINIMUM">2853</MDI>
+      <MDI key="STATISTICS_STDDEV">19.574796039626</MDI>
+      <MDI key="STATISTICS_VALID_PERCENT">56.38</MDI>
+    </Metadata>
+  </PAMRasterBand>
+</PAMDataset>

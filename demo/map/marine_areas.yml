@@ -1,0 +1,16 @@
+mcf:
+  version: 1.0
+identification:
+  title: marine areas
+  abstract: a funky layer
+distribution:
+  WMS:
+    url: map?service=WMS&amp;request=GetCapabilities
+    type: OGC:WMS
+    name: marine_areas
+    description: ''
+  WFS:
+    url: map?service=WFS&amp;request=GetCapabilities
+    type: OGC:WFS
+    name: marine_areas
+    description: ''

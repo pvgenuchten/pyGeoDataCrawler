@@ -1,0 +1,15 @@
+mcf:
+  version: 1.0
+identification:
+  title: 2
+distribution:
+  WMS:
+    url: map?service=WMS&amp;request=GetCapabilities
+    type: OGC:WMS
+    name: '00002'
+    description: ''
+  WCS:
+    url: map?service=WCS&amp;request=GetCapabilities
+    type: OGC:WCS
+    name: '00002'
+    description: ''

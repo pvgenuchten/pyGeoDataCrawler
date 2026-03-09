@@ -106,9 +106,6 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
         skipSubfolders = cnf2['skip-subfolders']
 
     for file in Path(target_path).iterdir():
-
-
-
         fname = str(file).split(os.sep).pop()
         if file.is_dir() and not fname.startswith('.') and not fname.startswith('~') and not str(file).endswith('.gdb'):
             # go one level deeper
@@ -129,8 +126,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                 relPath = ""
                 if mydir != "":
                     relPath = os.path.relpath(os.path.dirname(file), root)
-                # why is this, maybe sould be len(rp)==1?
-                if relPath == '1':
+                if relPath == os.sep or relPath == '.'+os.sep: # /
                     relPath == ''
                 if (dir_out_mode=='flat'):
                     outBase = os.path.join(dir_out,fn)
@@ -138,7 +134,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     outBase = os.path.join(dir_out,relPath,fn)
                 yf = os.path.join(outBase+'.yml')
                 #relPath=base.replace(root,'')
-                if extension.lower() in ["xml"] and fn != "index":
+                if extension.lower() in ["xml"] and ".aux.xml" not in str(file).lower() and fn != "index":
                     if mode == "init":
                         md=None
                         with open(str(file), mode="r", encoding="utf-8") as f:
@@ -225,7 +221,10 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     if dir_out_mode == "flat":
                                         pth = os.path.join(dir_out,safeFileName(md['metadata']['identifier'])+'.'+fext)
                                     else:
-                                        pth = os.path.join(target_path,safeFileName(md['metadata']['identifier'])+'.'+fext)
+                                        if not os.path.exists(os.path.join(dir_out,target_path)):
+                                            print('create folder',os.path.join(dir_out,target_path))
+                                            os.makedirs(os.path.join(dir_out,target_path))
+                                        pth = os.path.join(dir_out,target_path,safeFileName(md['metadata']['identifier'])+'.'+fext)
                                     with open(pth, 'w+') as ff:
                                         ff.write(xml_string)
                                         print(profile + ' generated at ' + pth)    
@@ -269,26 +268,25 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     break
 
                         if (hasFile):
-                            cnt = indexFile(dataFile, dataFile.split('.').pop()) 
-                            if 'metadata' not in orig or orig['metadata'] is None: 
-                                orig['metadata'] = {}
-                            orig['metadata'] = orig.get('metadata',{})
-                            orig['metadata']['datestamp'] = cnt.get('modified', datetime.date.today())  
-                            if 'identification' not in orig or orig['identification'] is None: 
-                                orig['identification'] = {}
-                            orig['identification']['extents'] = orig['identification'].get('extents',{})
-                            if 'bounds_wgs84' in cnt and cnt.get('bounds_wgs84') is not None:
-                                bnds = cnt.get('bounds_wgs84')
-                                crs = 4326
-                            else:
-                                bnds = cnt.get('bounds',[])
-                                crs = cnt.get('crs',4326)
-                            orig['identification']['extents']['spatial'] = [{'bbox': bnds, 'crs' : crs}]
-                            orig['content_info'] = cnt.get('content_info',{})
+                            cnt = indexFile(dataFile) #returns a mcf record
+ 
+                            # default title is filename, unless populated from embedded metadata, so adopt it if it is not filename
+                            keeptitle = False
+                            if cnt.get('identification',{}).get('title') not in [None,'',dataFile.split('.').pop()]:
+                                keeptitle = True
+                                oldtitle = orig.get('identification',{}).get('title')
+                            # keep identification
+                            oldID = orig.get('metadata',{}).get('identifier')
+
+                            dict_merge(orig, cnt)
+                            if keeptitle:
+                                orig['identification']['title'] = oldtitle
+                            if oldID not in [None,'']:
+                                orig['metadata']['identifier'] = oldID
 
                         skipOWS = False # not needed if this is fetched from remote
                         # check dataseturi, if it is a DOI/CSW/... we could extract some metadata
-                        if resolve and orig['metadata'].get('dataseturi','').startswith('http'):
+                        if resolve and orig.get('metadata',{}).get('dataseturi','').startswith('http'):
                             for u in orig['metadata']['dataseturi'].split(';'):
                                 md = fetchMetadata(u)
                                 dict_merge(orig, md)
@@ -410,8 +408,7 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                                     localFile = isDistributionLocal(v.get('url',''),target_path)
                                     if localFile:
                                         hasFile = localFile
-                                        cnt = indexFile(target_path+os.sep+hasFile, extension)
-                                        md2 = parseDC(cnt,fname)
+                                        md2 = indexFile(target_path+os.sep+hasFile)
                                         if (md2['identification']['title']):
                                             md2['identification']['title'] = None
                                         if md2['metadata']['identifier']:
@@ -432,34 +429,30 @@ def processPath(target_path, parentMetadata, mode, dbtype, dir_out, dir_out_mode
                     # print ('Indexing file ' + fname)
                     if not os.path.exists(yf): # only if yml not exists yet
                         # mode init for spatial files without metadata or update
-                        cnt = indexFile(fname, extension) 
-                        print('foo',cnt)
-                        md = parseDC(cnt,fname)
-                        print('foo2',md)
-                        checkId(md,str(os.path.join(relPath,fn)).replace(os.sep,'-'),prefix)
-                        if 'identification' not in md or md['identification'] is None:
-                            md['identification'] = {}
-                        if 'title' not in md['identification'] or md['identification']['title'] in [None,'']:
-                            md['identification']['title'] = str(os.path.join(relPath,fn)).replace(os.sep,' ')
-                        if 'distribution' not in md or md['distribution'] is None:
-                            md['distribution'] = {}
-                        if len(md['distribution'].keys()) == 0:
-                            if webdavUrl:
-                                lnk = webdavUrl+"/"+relPath+"/"+fn+'.'+extension
-                            else:
-                                lnk = str(file)
-                            md['distribution']['local'] = { 'url':lnk, 'type': 'WWW:LINK', 'name':fn+'.'+extension }
+                        md = indexFile(fname) 
+                        if md:
+                            checkId(md,'-'.join(i for i in str(os.path.join(relPath,fn)).split(os.sep) if i not in ['','.','..',' ']),prefix)
+                            if 'identification' not in md.keys() or md['identification'] is None:
+                                md['identification'] = {}
+                            if 'distribution' not in md.keys() or md['distribution'] is None:
+                                md['distribution'] = {}
+                            if len(md['distribution'].keys()) == 0:
+                                if webdavUrl:
+                                    lnk = webdavUrl+"/"+relPath+"/"+fn+'.'+extension
+                                else:
+                                    lnk = str(file)
+                                md['distribution']['local'] = { 'url':lnk, 'type': 'WWW:LINK', 'name':fn+'.'+extension }
 
-                        if not os.path.exists(os.path.join(dir_out,relPath)):
-                            print('create folder',os.path.join(dir_out,relPath))
-                            os.makedirs(os.path.join(dir_out,relPath))
-                            
-                        # write yf
-                        try:
-                            with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
-                                yaml.dump(md, f, sort_keys=False)
-                        except Exception as e:
-                            print('Failed to dump yaml:',e)
+                            if not os.path.exists(os.path.join(dir_out,relPath)):
+                                print('create folder',os.path.join(dir_out,relPath))
+                                os.makedirs(os.path.join(dir_out,relPath))
+                                
+                            # write yf
+                            try:
+                                with open(yf, 'w') as f: # todo: use identifier from metadata? if it were extracted from xml for example
+                                    yaml.dump(md, f, sort_keys=False)
+                            except Exception as e:
+                                print('Failed to dump yaml:',e)
                 else:
                     None
                     # print('Skipping {}, no indexable file type: {}'.format(fname, extension))
@@ -534,7 +527,7 @@ def importCsv(dir,dir_out,map='',sep='',enc='',cluster='',prefix=''):
                             fn = safeFileName(myid)
                             if len(fn) > 32:
                                 fn = fn[:32]
-                            elif len(fn) < 16: ## extent title with organisation else part of abstract
+                            elif len(fn) < 8: ## extent title with organisation else part of abstract
                                 letters = yMcf['identification'].get('abstract')
                                 for c in yMcf.get('contact',{}).keys():
                                     letters = yMcf['contact'][c].get('organization',yMcf['contact'][c].get('individualname','None'))
@@ -548,10 +541,12 @@ def importCsv(dir,dir_out,map='',sep='',enc='',cluster='',prefix=''):
     # elif index = postgis
 
 def checkId(md, fn, prefix):
+    if not md: 
+        md = {}
     if md.get('metadata') in [None,'']:
         md['metadata'] = {}
     if md.get('metadata').get('identifier','') in [None,'']: 
-        if md.get('metadata',{}).get('dataseturi','') != '': 
+        if md.get('metadata',{}).get('dataseturi','') not in [None,'']:
             myuuid = md.get('metadata',{}).get('dataseturi','').split("://").pop()
             domains = ["drive.google.com/file/d","doi.org","data.europa.eu","researchgate.net/publication","handle.net","osf.io","library.wur.nl","freegisdata.org/record"]
             for d in domains:
