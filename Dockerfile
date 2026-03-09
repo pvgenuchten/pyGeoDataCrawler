@@ -1,45 +1,37 @@
-FROM harbor.containers.wurnet.nl/isric/pycsw:2.9.11 
-#locally, build pcsw image first as docker build -t isric/pycsw .
-#FROM isric/pycsw:latest
-#FROM geopython/pycsw
+FROM ghcr.io/osgeo/gdal:ubuntu-small-3.12.2
 
-USER root
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# ARGS
-ARG TIMEZONE="Europe/Amsterdam"
-ARG LOCALE="en_US.UTF-8"
-#nano, sync for operations 
-ARG ADD_DEB_PACKAGES="nano nmap rsync sqlite3"
-#for sld creation
-ARG ADD_PIP_PACKAGES=""
+ENV VENV=/opt/venv
+ENV PATH="$VENV/bin:$PATH"
 
-ENV TZ=${TIMEZONE} \
-	DEBIAN_FRONTEND="noninteractive" \
-	DEB_BUILD_DEPS="tzdata build-essential apt-utils" \
-	DEB_PACKAGES="locales python3-pip gdal-bin libgdal-dev python3-dev ${ADD_DEB_PACKAGES}"
+# Install Python and minimal build dependencies
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    python3 \
+    git \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    build-essential \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
-RUN \
-	# Install dependencies
-	apt-get update \
-	&& apt-get --no-install-recommends install -y ${DEB_BUILD_DEPS} ${DEB_PACKAGES} \
-	# Timezone
-	&& cp /usr/share/zoneinfo/${TZ} /etc/localtime\
-	&& dpkg-reconfigure tzdata \
-	# Locale
-	&& sed -i -e "s/# ${LOCALE} UTF-8/${LOCALE} UTF-8/" /etc/locale.gen \
-	&& dpkg-reconfigure --frontend=noninteractive locales \
-	&& update-locale LANG=${LOCALE} \
-	&& echo "For ${TZ} date=$(date)" && echo "Locale=$(locale)" 
+# create virtualenv
+RUN python3 -m venv $VENV
 
-COPY . /pyGeoDataCrawler
-WORKDIR /pyGeoDataCrawler 
-RUN apt --no-install-recommends install -y software-properties-common
-RUN pip install poetry
-RUN gdal-config --version
-RUN poetry run pip install GDAL==3.4.3
-#RUN poetry add gdal==3.4.3
-RUN poetry install
-#RUN poetry build
-#RUN poetry shell
+# upgrade tooling
+# RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-ENTRYPOINT ["tail", "-f", "/dev/null"]
+# Install Python GDAL bindings matching system GDAL
+RUN GDAL_VERSION=$(gdal-config --version | cut -d. -f1-2) \
+ && pip install --no-cache-dir "GDAL==${GDAL_VERSION}.*"
+
+# Install pycsw
+RUN pip install --no-cache-dir git+https://github.com/geopython/pycsw.git@master
+RUN pip install --no-cache-dir git+https://github.com/pvgenuchten/pygeodatacrawler.git@main
+
+# Default command
+CMD ["crawl-metadata", "--help"]
