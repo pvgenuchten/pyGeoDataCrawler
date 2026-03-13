@@ -59,9 +59,9 @@ def indexDir(dir, dir_out, dir_out_mode, mode, dbtype, profile, db, map, resolve
         resolve = False
     if not prefix:
         prefix = ""
-    elif dir_out[-1] == os.sep:
+    if dir_out[-1] == os.sep: # remove / 
         dir_out = dir_out[:-1]
-    if not dir_out_mode or dir_out_mode not in ["flat","nested"]:
+    if not dir_out_mode or dir_out_mode not in ["flat"]:
         dir_out_mode = "nested"
     if not mode:
         mode = "init"
