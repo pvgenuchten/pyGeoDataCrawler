@@ -30,6 +30,7 @@ RUN GDAL_VERSION=$(gdal-config --version | cut -d. -f1-2) \
  && pip install --no-cache-dir "GDAL==${GDAL_VERSION}.*"
 
 # Install pycsw
+RUN pip install --no-cache-dir SQLAlchemy<2.0.0
 RUN pip install --no-cache-dir git+https://github.com/geopython/pycsw.git@master
 RUN pip install --no-cache-dir git+https://github.com/pvgenuchten/pygeodatacrawler.git@main
 
