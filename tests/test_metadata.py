@@ -1,4 +1,4 @@
-from geodatacrawler.utils import parseDC, parseDataCite, parseISO, fetchMetadata
+from geodatacrawler.utils import parseDC, parseDataCite, parseISO, fetchMetadata, indexFile
 
 def test_parseDC():
     foo = parseDC({
@@ -41,6 +41,23 @@ def test_parseISO():
 
     assert str(foo['mcf']['version']) == '1.0'
     assert foo['identification']['title'] == 'Aerial Photos'
+
+def test_tiff_embedded():
+    f = indexFile("./demo/grid/era5-temperature_2m.tif")
+    title = f['identification']['title']
+    assert title == "ERA5 derived values - temperature_2m"
+    license = f['identification']['license']['url']
+    assert license == "https://creativecommons.org/licenses/by/4.0/"
+    src = None
+    for r in f['metadata']['relations']:
+        if r.get('type') == 'source':
+            src = r.get('identifier')
+    assert src == 'https://developers.google.com/earth-engine/datasets/catalog/ECMWF_ERA5_LAND_MONTHLY_AGGR'
+    #units = None
+    #for d in f['content_info']['dimensions']:
+    #    units = d.get('units')
+    #assert units = 'K'
+
 
 def test_parseCSWISO():
     foo = parseISO('''<?xml version="1.0" encoding="UTF-8"?><csw:GetRecordByIdResponse xmlns:csw="http://www.opengis.net/cat/csw/2.0.2">

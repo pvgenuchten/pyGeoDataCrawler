@@ -27,13 +27,11 @@ RUN python3 -m venv $VENV
 # RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Install Python GDAL bindings matching system GDAL
-RUN GDAL_VERSION=$(gdal-config --version | cut -d. -f1-2) \
- && pip install --no-cache-dir "GDAL==${GDAL_VERSION}.*"
-
+RUN pip install --no-cache-dir "GDAL==3.12.2"
 # Install pycsw
 RUN pip install --no-cache-dir "SQLAlchemy<2.0.0"
 RUN pip install --no-cache-dir git+https://github.com/geopython/pycsw.git@master
-RUN pip install --no-cache-dir geodatacrawler==1.3.12
+RUN pip install --no-cache-dir geodatacrawler==1.3.14
 
 # Default command
 CMD ["crawl-metadata", "--help"]

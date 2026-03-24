@@ -19,6 +19,7 @@ from pygeometa.schemas.iso19139 import ISO19139OutputSchema
 from geodatacrawler import GDCCONFIG
 import importlib.metadata
 
+gdal.UseExceptions()
 
 # for each run of the sript a cache is built up, so getcapabilities is only requested once (maybe cache on disk?)
 OWSCapabilitiesCache = {'WMS':{},'WFS':{},'WMTS':{}, 'WCS':{}}
@@ -91,6 +92,7 @@ def indexFile(fpath):
         bounds = [float(ulx), float(lry), float(lrx), float(uly)]
         if acrs:    
             if crs2code(acrs) == 'EPSG:4326':
+                print('c',acrs)
                 bounds_wgs84 = bounds
                 content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
             else:
@@ -104,7 +106,7 @@ def indexFile(fpath):
             content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
 
         # get tiff metadata, and merge initial content
-        meta = parseDC(d.GetMetadata(),fpath)
+        meta = parseDC(d.GetMetadata(), fpath)
         dict_merge(content, meta)
         content['content_info'] = {
                 'type': 'image',
@@ -148,9 +150,13 @@ def indexFile(fpath):
         bounds = [b[0],b[2],b[1],b[3]]
 
         if srs:
-            if crs2code(srs) == 'EPSG:4326':
+            crs_code = crs2code(srs)
+            if crs_code == 'EPSG:4326':
+                print('zoo')
                 content['identification']['extents']['spatial'] = [{"bbox": bounds, "crs": 4326}]
-            else:
+            elif crs_code not in [None,'']:
+                content['identification']['extents']['spatial'] = [{"bbox": bounds, "crs": crs_code}]
+            else:   # no crs code match; not optimal, because mapserver won't be able to use this
                 bounds_wgs84 = reprojectBounds(bounds,srs,4326)
                 crs = crs2code(srs)
                 content['identification']['extents']['spatial'] = [{"bbox": bounds_wgs84,"crs": 4326},{"bbox":bounds, "crs": crs}]
@@ -205,25 +211,12 @@ def dict_merge(dct, merge_dct):
 
 
 def crs2code(crs):
-    if crs == None:
-        return ""
-    if isinstance(crs,str):
-        crs = osr.SpatialReference(crs)
+    if crs in [None, 0, '']:
+        return ''
     try:
-        epsg = crs.AutoIdentifyEPSG()
-        if epsg == 0:
-            epsg_id = int(crs.GetAuthorityCode(None))
-            assert epsg_id is not None
-            return (crs.GetAuthorityName(None)+":"+str(epsg_id))
-        else:
-            matches = crs.FindMatches()
-            for m in matches:
-                if m[1] >= 50:
-                    return crs2code(m[0])
-                else:
-                    print('No match:',crs2code(m[0]),m[1],'%')
-            # Authoritative EPSG ID could not be found, return crs-str
-            return ""
+        crs = osr.SpatialReference(str(crs))
+        crs2 = CRS.from_wkt(crs.ExportToWkt())
+        return ':'.join(crs2.to_authority())
     except Exception as e:
         print('Error parsing crs: ', e, str(crs))
         return ""
@@ -711,6 +704,14 @@ def parseDC(dct, fname):
         
     exp['identification']['abstract'] = ' '.join(i for i in [dct.get('description'),dct.get('abstract')] if i)
 
+    # process source as relation
+    if 'source' in dct.keys() and dct['source'] not in [None,'']:
+        exp['metadata']['relations'] = [] 
+        exp['metadata']['relations'].append({
+            "identifier": dct['source'], 
+            "type": "source"
+        })
+
     exp['metadata']['datestamp'] = dct.get('modified', dct.get('year', date.today())) 
     ct3=[]
     for ct in "author,publisher,creator".split(','):    
@@ -740,14 +741,21 @@ def parseDC(dct, fname):
        exp['spatial']['datatype'] = dct.get('datatype','')
     if 'geomtype' in dct:
        exp['spatial']['geomtype'] = dct.get('geomtype','').lower()
-    exp['identification']['status'] = dct.get('contentStatus','' )
-    exp['identification']['language'] = dct.get('language','')
-    exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
-    exp['identification']['rights'] = dct.get('copyright','')
-    if dct.get('license','').startswith('http'):
-        exp['identification']['license'] = {'url': dct.get('license')}
-    elif dct.get('license') not in [None,'']:
-        exp['identification']['license'] = {'name': dct.get('license')}
+    if 'contentStatus' in dct.keys():   
+        exp['identification']['status'] = dct.get('contentStatus','' )
+    if 'language' in dct.keys():       
+        exp['identification']['language'] = dct.get('language','')
+    if 'language' in dct.keys():     
+        exp['identification']['dates'] = { 'creation': dct.get('created', dct.get('year')) }
+    if any(item in ['rights','rightsHolder','accessRights','copyright'] for item in dct.keys()):    
+        exp['identification']['rights'] = dct.get('rights',dct.get('rightsHolder',dct.get('accessRights',dct.get('copyright',''))))
+    if 'licence' in dct.keys():   # some bug in our tiff metadata tool
+        dct['license'] = dct['licence']
+    if 'license' in dct.keys(): 
+        if dct.get('license', '').startswith('http'):
+            exp['identification']['license'] = {'url': dct.get('license')}
+        else:
+            exp['identification']['license'] = {'name': dct.get('license')}
     bnds = None
     if 'bounds_wgs84' in dct and dct.get('bounds_wgs84') is not None:
         bnds = dct.get('bounds_wgs84')

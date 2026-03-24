@@ -12,6 +12,8 @@ def test_raster_colorCoding():
     assert clsstr.find("'2'") > -1
     clsstr = colorCoding('grid',2,5,['a'])
     assert clsstr.find('2 - 5') > -1
+    clsstr = colorCoding('grid',2.12345,3.123456789,['a'])
+    assert clsstr.find('2.12 - 3.12') > -1
     clsstr = colorCoding('grid',10,2,['a','b'])
     assert clsstr == ""
     clsstr = colorCoding('grid',2,10,{"classes":['a','b'],"name":"foo"})
@@ -41,9 +43,24 @@ def test_vector_colorCoding():
     assert clsstr.find('56a1b3') > -1
 
 def test_proj():
-        f = indexFile("./demo/grid/era5-temperature_2m.tif")
-        #foo = reprojectBounds([1537886.2528828776, -1063208.0434537493, 2424636.2528828774, 88791.95654625073], osr.SpatialReference(f['crs-str']), 4326)
-        #assert foo[0]==168.48720712208527 
+    f = indexFile("./demo/grid/era5-temperature_2m.tif")
+    crs = None
+    for se in f['identification']['extents']['spatial']:
+        if se.get('crs') != 4326:   # multiple exist
+            crs = se.get('crs')
+    assert crs == "EPSG:32736"
+    srs = osr.SpatialReference()
+    srs.SetFromUserInput(crs)
+    foo = reprojectBounds(
+        [1537886.2528828776, -1063208.0434537493, 2424636.2528828774, 88791.95654625073], 
+        srs, 4326)
+    assert foo[0] == 168.48720712208527
+    f = indexFile("./demo/grid/pHH2O_unspec_mean_0-30cm.tif")
+    crs = None
+    for se in f['identification']['extents']['spatial']:
+        if se.get('crs') != 4326:   # multiple exist
+            crs = se.get('crs')
+    assert crs == "ESRI:54052"
 
 def test_map():
     processPath('',initialConfig('./demo/map', './tests/map'), "./tests/map", "flat", "false")
