@@ -72,7 +72,7 @@ For grid files, the metadata will be extracted from the .aux.xml file. You can u
 The metadata identified can be used to create OGC services exposing the files. Currently the tool creates [mapserver mapfiles](https://www.mapserver.org/mapfile/), which are placed on a output-folder. A `index.yml` configuraton file is expected at the root of the folder to be indexed, if not, it will be created.
 
 ```
-crawl-mapfile --dir=/mnt/data [--out-dir=/mnt/mapserver/mapfiles]
+crawl-maps --dir=/mnt/data [--out-dir=/mnt/mapserver/mapfiles]
 ```
 
 Some parameters in the mapfile can be set using environment variables:
@@ -183,7 +183,7 @@ The project is based on common coding conventions from the python poetry communi
 On the sources, either run scripts directly:
 
 ```
-poetry run crawl-mapfile --dir=/mnt/data
+poetry run crawl-maps --dir=/mnt/data
 ```
 
 or run a shell in the poetry environment:
