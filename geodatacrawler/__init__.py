@@ -1,8 +1,8 @@
-__version__ = '1.3.14'
+__version__ = '1.3.15'
 
 GDCCONFIG = {
 "TEXT_FILE_TYPES":  ['xlsm', 'xlsx', 'xltx', 'xltm', 'db', 'csv'],
-"GRID_FILE_TYPES": ['tif', 'grib2', 'nc', 'vrt','jpg','jpeg','png'],
+"GRID_FILE_TYPES": ['tif', 'grib2', 'nc', 'vrt'],
 "VECTOR_FILE_TYPES": ['shp', 'mvt', 'dxf', 'dwg', 'gdb', 'fgdb', 'gml', 'gpx', 'kml', 'geojson', 'gpkg', 'sqlite', 'kmz', 'parquet']
 }
 driverSupport = {'shp':'ESRI Shapefile', 'parquet':'Parquet', 'dwg': 'CAD','gdb': 'OpenFileGDB','fgdb': 'OpenFileGDB', 'gpkg': 'GPKG', 'sqlite': 'SQLite' } 

@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir "GDAL==3.12.2"
 # Install pycsw
 RUN pip install --no-cache-dir "SQLAlchemy<2.0.0"
 RUN pip install --no-cache-dir git+https://github.com/geopython/pycsw.git@master
-RUN pip install --no-cache-dir geodatacrawler==1.3.14
+RUN pip install --no-cache-dir geodatacrawler==1.3.15
 
 # Default command
 CMD ["crawl-metadata", "--help"]

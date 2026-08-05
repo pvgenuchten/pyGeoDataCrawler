@@ -92,7 +92,6 @@ def indexFile(fpath):
         bounds = [float(ulx), float(lry), float(lrx), float(uly)]
         if acrs:    
             if crs2code(acrs) == 'EPSG:4326':
-                print('c',acrs)
                 bounds_wgs84 = bounds
                 content['identification']['extents']['spatial'] = [{"bbox": bounds,"crs": 4326}]
             else:
@@ -124,25 +123,34 @@ def indexFile(fpath):
         b=""
         attrs = {}
         ds = ogr.Open(fpath)
-        for i in ds:
+        for i in ds: # this loops through multiple files, but sets only one!
+            # mcf types: complex, composite, curve, point, solid, surface
+            tp0 = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType()).lower()
+            if tp0 in ['line string', 'polyline', 'line', 'curve', 'multi line', 'wkblinestring']:
+                tp = 'curve'
+            elif tp0 in ['polygon', 'multi polygon', 'surface', 'multi surface', '3d polygon']:
+                tp = 'surface'
+            elif tp0 in ['3d point', 'point', 'multi point']:
+                tp = 'point' 
+            elif tp0 in [None,'none']:
+                continue
+            else:
+                print('Unknown type', tp0)
+                continue
+ 
             ln = i.GetName()
             b = i.GetExtent()
             fc = i.GetFeatureCount()
             srs = i.GetSpatialRef()
-            tp0 = ogr.GeometryTypeToName(i.GetLayerDefn().GetGeomType()).lower()
-            # mcf types: complex, composite, curve, point, solid, surface
-            if tp0 in ['line string','polyline','line','curve','multiline','wkblinestring']:
-                tp = 'curve'
-            elif tp0 in ['polygon','multipolygon','surface']:
-                tp = 'surface'
-            elif tp0 in ['point','multipoint']:
-                tp = 'point' 
-            else:
-                tp = 'complex'
             attrs = []
             for f in range(i.GetLayerDefn().GetFieldCount()):
                 fld = i.GetLayerDefn().GetFieldDefn(f)
                 attrs.append({'name': fld.GetName(), 'type': fld.GetTypeName() }) 
+        
+        if not tp:  
+            print('none of the layers had a spatial type')
+            return content
+        
         content['content_info'] = {"attributes": attrs}
         # mcf datatypes: vector - grid - textTable - tin - stereoModel - video
         content['spatial'] = {'datatype': 'vector', 'geomtype': tp}
@@ -216,7 +224,10 @@ def crs2code(crs):
     try:
         crs = osr.SpatialReference(str(crs))
         crs2 = CRS.from_wkt(crs.ExportToWkt())
-        return ':'.join(crs2.to_authority())
+        if crs2.to_authority():
+            return ':'.join(crs2.to_authority())
+        else:
+            return str(crs2)
     except Exception as e:
         print('Error parsing crs: ', e, str(crs))
         return ""

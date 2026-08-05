@@ -4,7 +4,7 @@ from importlib.resources import path
 from copy import deepcopy
 from decimal import *
 import mappyfile, click, yaml
-import os, time, sys, re, math, glob
+import os, time, sys, re, math, glob, traceback
 import pprint
 import urllib.request
 from geodatacrawler.utils import indexFile, dict_merge
@@ -173,6 +173,10 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                 fn = os.path.basename(sf)
                                 fb, ext = os.path.splitext(fn)
                                 fileinfo = indexFile(sf)
+                                # is this a spatial file?
+                                if not fileinfo.get('spatial',{}).get('datatype'):
+                                    print(f'`{fn}` is not a spatial file, skipping')
+                                    continue
                                 lyr['connectiontype'] = 'OGR'
                                 dataPath = os.path.join('' if dir_out_mode == 'nested' else relPath,fn) # nested or flat
                                 lyr['data'] = fb # layername
@@ -290,7 +294,7 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     mdurl=config['mdUrlPattern'].format(cnt.get('metadata',{}).get('identifier',fb)) if config['mdUrlPattern'] != '' else '', # or use the externalid here (doi)
                                     classes=new_class_string2)
                                 #except Exception as e:
-                                #    print("Failed creation of layer {0}; {1}".format(cnt['name'], e))
+                                #    print("Failed creation of layer {0}; {1} {2}".format(cnt['name'], e, traceback.print_exc()))
                                     
                                 try:
                                     mslr = mappyfile.loads(strLr)
@@ -348,7 +352,6 @@ def checkLink(md, type, config):
 Append a link to this service
 '''
 def addLink(type, layer, file, relPath, map, config):
-    print(f'Add link {type} to {str(file)}')
     # read file
     with open(str(file), mode="r", encoding="utf-8") as f:
         orig = yaml.load(f, Loader=SafeLoader)
@@ -459,9 +462,9 @@ def msStyler(geomtype,cls):
         return f'COLOR "{color}"\n'
     elif geomtype=='point':
       return f'SYMBOL "{symbol}"\nCOLOR "{color}"\nSIZE {str(size)}\nOUTLINECOLOR "{linecolor}"\nOUTLINEWIDTH 0.1\n'
-    elif geomtype=='polyline':
+    elif geomtype=='polyline' or geomtype=='curve':
         return f'WIDTH {str(width)}\nCOLOR "{color}"\nLINEJOIN "bevel"\n'
-    elif geomtype=='polygon':
+    elif geomtype=='polygon' or geomtype=='surface':
         return f'COLOR "{color}"\nOUTLINECOLOR "{linecolor}"\nOUTLINEWIDTH {str(width)}\n'
     else:
         print(f'unknown type when building class element: {geomtype}')

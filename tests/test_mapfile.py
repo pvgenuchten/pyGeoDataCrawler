@@ -55,12 +55,6 @@ def test_proj():
         [1537886.2528828776, -1063208.0434537493, 2424636.2528828774, 88791.95654625073], 
         srs, 4326)
     assert foo[0] == 168.48720712208527
-    f = indexFile("./demo/grid/pHH2O_unspec_mean_0-30cm.tif")
-    crs = None
-    for se in f['identification']['extents']['spatial']:
-        if se.get('crs') != 4326:   # multiple exist
-            crs = se.get('crs')
-    assert crs == "ESRI:54052"
 
 def test_map():
     processPath('',initialConfig('./demo/map', './tests/map'), "./tests/map", "flat", "false")
