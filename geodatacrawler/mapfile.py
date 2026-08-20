@@ -185,6 +185,9 @@ def processPath(relPath, parentMetadata, dir_out, dir_out_mode, recursive):
                                     lyr['type'] = 'grid'
                                     lyr['data'] = dataPath
                                     lyr['connection'] = ''
+                                    # if set to pixel (default), you get many hits on small scales
+                                    lyr['toleranceunits'] = 'meters'
+                                    lyr['tolerance'] = '25'
                                 elif (fileinfo.get('spatial',{}).get('geomtype','') == "curve"):
                                     lyr['type'] = 'line'
                                 elif (fileinfo.get('spatial',{}).get('geomtype','') == "point"):  # table is suggested for CSV, which is usually point (or none)
